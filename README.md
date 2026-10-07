@@ -59,7 +59,26 @@ sudo apt install ./clipmaster_1.0.0_all.deb
 
 ---
 
-### Cách 3: Sử dụng bằng dòng lệnh (CLI)
+### Cách 3: Đóng gói và cài đặt qua Snap (Snapcraft / Snap Store)
+Cấu hình Snap đã được tạo sẵn tại thư mục `snap/`:
+- **Đóng gói file `.snap` bằng Snapcraft:**
+  ```bash
+  snapcraft
+  ```
+- **Cài đặt file `.snap` cục bộ:**
+  ```bash
+  sudo snap install clipmaster_1.0.0_amd64.snap --dangerous
+  ```
+- **Đăng ký và phát hành lên Snap Store:**
+  ```bash
+  snapcraft login
+  snapcraft register clipmaster
+  snapcraft upload clipmaster_1.0.0_amd64.snap --release=stable
+  ```
+
+---
+
+### Cách 4: Sử dụng bằng dòng lệnh (CLI)
 
 - **Bật / tắt cửa sổ danh sách:**
   ```bash
@@ -153,6 +172,9 @@ clipMaster/
 ├── install.sh             # Script cài đặt tự động 1-click
 ├── uninstall.sh           # Script gỡ cài đặt
 ├── build_deb.sh           # Script đóng gói thành file cài .deb
+├── snap/
+│   ├── snapcraft.yaml     # Cấu hình đóng gói Snapcraft (Snap Store)
+│   └── gui/               # Desktop launcher và icon cho Snap
 ├── assets/
 │   ├── icon.svg           # Icon vector của ứng dụng
 │   └── style.css          # Giao diện CSS tùy biến (Dark/Light card design)
@@ -251,7 +273,26 @@ sudo apt install ./clipmaster_1.0.0_all.deb
 
 ---
 
-### Method 3: Command Line Interface (CLI)
+### Method 3: Build & Install via Snap (Snapcraft / Snap Store)
+Snap configuration is pre-configured in the `snap/` directory:
+- **Build `.snap` package using Snapcraft:**
+  ```bash
+  snapcraft
+  ```
+- **Install `.snap` package locally:**
+  ```bash
+  sudo snap install clipmaster_1.0.0_amd64.snap --dangerous
+  ```
+- **Register and publish to Snap Store:**
+  ```bash
+  snapcraft login
+  snapcraft register clipmaster
+  snapcraft upload clipmaster_1.0.0_amd64.snap --release=stable
+  ```
+
+---
+
+### Method 4: Command Line Interface (CLI)
 
 - **Toggle history popup window:**
   ```bash
@@ -345,6 +386,9 @@ clipMaster/
 ├── install.sh             # 1-click automated installer
 ├── uninstall.sh           # Clean uninstaller
 ├── build_deb.sh           # Debian package builder
+├── snap/
+│   ├── snapcraft.yaml     # Snapcraft package configuration (Snap Store)
+│   └── gui/               # Desktop launcher and application icon for Snap
 ├── assets/
 │   ├── icon.svg           # High-resolution vector icon
 │   └── style.css          # Custom stylesheet (Dark/Light card design)

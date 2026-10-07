@@ -1,0 +1,84 @@
+name: clipmaster
+title: ClipMaster
+base: core22
+version: '1.0.0'
+summary: Windows + V style Clipboard History Manager for Linux
+description: |
+  ClipMaster is a modern, high-productivity clipboard history manager for Ubuntu
+  and Linux desktop environments (GNOME, Zorin OS, Debian), bringing the seamless
+  Windows + V experience to your workflow.
+
+  Key Highlights:
+  - Global Win + V shortcut (<Super>v) to toggle clipboard history popup
+  - Libadwaita & GTK4 modern card design with Dark Mode, Light Mode, and System Default
+  - Instant search filter across all copied history (Ctrl + F)
+  - Smart content classification: Plain text, Source code, URLs, Colors (HEX/RGB), and Images
+  - Pinned items protection (Pin items so they are never deleted)
+  - One-click auto-paste into active applications
+  - Privacy mode (Pause / resume recording with one click)
+  - Bilingual support (Vietnamese & English)
+
+grade: stable
+confinement: strict
+
+license: MIT
+website: https://github.com/vobinh/clipmaster
+contact: https://github.com/vobinh/clipmaster/issues
+issues: https://github.com/vobinh/clipmaster/issues
+source-code: https://github.com/vobinh/clipmaster
+
+architectures:
+  - build-on: amd64
+
+apps:
+  clipmaster:
+    command: usr/bin/python3 $SNAP/clipmaster.py
+    desktop: snap/gui/clipmaster.desktop
+    extensions: [gnome]
+    plugs:
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - gsettings
+      - home
+      - unity7
+    environment:
+      PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
+
+  daemon:
+    command: usr/bin/python3 $SNAP/clipmaster.py --daemon
+    daemon: simple
+    extensions: [gnome]
+    plugs:
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - gsettings
+      - home
+      - unity7
+    environment:
+      PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
+
+parts:
+  clipmaster:
+    plugin: dump
+    source: .
+    stage-packages:
+      - python3-gi
+      - gir1.2-gtk-4.0
+      - gir1.2-adw-1
+      - xdotool
+      - xsel
+      - sqlite3
+    prime:
+      - clipmaster.py
+      - src
+      - assets
+      - -build*
+      - -*.deb
+      - -*.snap
+      - -__pycache__*
+      - -*.pyc
+      - -.git*

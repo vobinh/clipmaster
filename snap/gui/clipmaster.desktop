@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=ClipMaster
+GenericName=Clipboard Manager
+GenericName[vi]=Trình quản lý Clipboard
+Comment=Windows + V style Clipboard History Manager for Linux
+Comment[vi]=Quản lý lịch sử sao chép clipboard giống Windows + V
+Exec=clipmaster --toggle
+Icon=clipmaster
+Terminal=false
+Type=Application
+Categories=Utility;Accessories;
+Keywords=clipboard;paste;copy;history;win+v;clipmaster;
+StartupNotify=false

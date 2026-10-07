@@ -1,7 +1,12 @@
-# Debian packaging & build artifacts
+# Packaging & build artifacts
 *.deb
+*.snap
 build/
 dist/
+parts/
+stage/
+prime/
+.snapcraft/
 
 # Python cache & bytecode
 __pycache__/
