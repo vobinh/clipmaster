@@ -32,7 +32,7 @@ architectures:
 
 apps:
   clipmaster:
-    command: usr/bin/python3 $SNAP/clipmaster.py
+    command: bin/clipmaster
     desktop: snap/gui/clipmaster.desktop
     extensions: [gnome]
     plugs:
@@ -47,7 +47,7 @@ apps:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
 
   daemon:
-    command: usr/bin/python3 $SNAP/clipmaster.py --daemon
+    command: bin/clipmaster --daemon
     daemon: simple
     extensions: [gnome]
     plugs:
@@ -66,16 +66,16 @@ parts:
     plugin: dump
     source: .
     stage-packages:
+      - python3
       - python3-gi
       - gir1.2-gtk-4.0
       - gir1.2-adw-1
       - xdotool
       - xsel
       - sqlite3
+    organize:
+      assets/icon.svg: usr/share/icons/hicolor/scalable/apps/clipmaster.svg
     prime:
-      - clipmaster.py
-      - src
-      - assets
       - -build*
       - -*.deb
       - -*.snap

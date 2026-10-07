@@ -1,0 +1,3 @@
+#!/bin/sh
+SNAP_DIR="${SNAP:-$(cd "$(dirname "$0")/.." && pwd)}"
+exec python3 "$SNAP_DIR/clipmaster.py" "$@"
