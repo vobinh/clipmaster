@@ -21,7 +21,14 @@ fi
 # 2. Dừng các phiên bản cũ đang chạy ngầm
 pkill -f "clipmaster.py" 2>/dev/null || true
 
-# 3. Cài đặt phím tắt Win + V và launcher
+# 3. Cài đặt icon vào hệ thống icon của người dùng
+mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
+cp "$SCRIPT_DIR/assets/icon.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/clipmaster.svg"
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+fi
+
+# 4. Cài đặt phím tắt Win + V và launcher
 python3 "$SCRIPT_DIR/clipmaster.py" --install-shortcut
 
 # 3. Cấu hình systemd user service để chạy ngầm tự động

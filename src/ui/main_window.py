@@ -47,6 +47,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_default_size(460, 620)
         self.add_css_class("clipmaster-window")
 
+        # Configure Icon theme so GTK can always find clipmaster icon
+        display = Gdk.Display.get_default()
+        if display:
+            theme = Gtk.IconTheme.get_for_display(display)
+            assets_dir = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "assets")
+            )
+            if os.path.exists(assets_dir):
+                theme.add_search_path(assets_dir)
+            user_icon_dir = os.path.expanduser("~/.local/share/icons/hicolor/scalable/apps")
+            if os.path.exists(user_icon_dir):
+                theme.add_search_path(user_icon_dir)
+        self.set_icon_name("clipmaster")
+
         # Hide window on close instead of destroying
         self.connect("close-request", self._on_close_request)
 

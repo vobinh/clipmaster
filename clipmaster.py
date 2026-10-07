@@ -31,6 +31,10 @@ from src.shortcut_manager import (
     format_shortcut_display
 )
 
+# Set application name and program name for GNOME / Wayland window tracking
+GLib.set_prgname("clipmaster")
+GLib.set_application_name("ClipMaster")
+
 
 def get_ipc_socket_path():
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR", os.path.expanduser("~/.local/share/clipmaster"))

@@ -98,8 +98,10 @@ Type=Application
 Categories=Utility;Accessories;
 Keywords=clipboard;paste;copy;history;win+v;clipmaster;
 StartupNotify=false
+StartupWMClass=clipmaster
 EOF
 chmod 644 "$DEB_DIR/usr/share/applications/clipmaster.desktop"
+ln -sf clipmaster.desktop "$DEB_DIR/usr/share/applications/com.clipmaster.ClipMaster.desktop"
 
 # 8. Copy Icon hệ thống
 cp "$SCRIPT_DIR/assets/icon.svg" "$DEB_DIR/usr/share/icons/hicolor/scalable/apps/clipmaster.svg"

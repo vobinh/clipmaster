@@ -29,10 +29,30 @@ def get_clipmaster_command() -> str:
     return f"python3 {CLIPMASTER_PATH}"
 
 
+def install_user_icon():
+    """Copy scalable icon to user icon theme."""
+    target_dir = os.path.expanduser("~/.local/share/icons/hicolor/scalable/apps")
+    os.makedirs(target_dir, exist_ok=True)
+    target_file = os.path.join(target_dir, "clipmaster.svg")
+    src_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "icon.svg"))
+    if os.path.exists(src_file):
+        try:
+            import shutil
+            shutil.copy2(src_file, target_file)
+            subprocess.run(["gtk-update-icon-cache", "-q", "-t", "-f", os.path.expanduser("~/.local/share/icons/hicolor")], capture_output=True)
+        except Exception:
+            pass
+
+
 def get_icon_path_or_name() -> str:
+    install_user_icon()
     if os.path.exists("/usr/share/icons/hicolor/scalable/apps/clipmaster.svg"):
         return "clipmaster"
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "icon.svg"))
+    user_icon = os.path.expanduser("~/.local/share/icons/hicolor/scalable/apps/clipmaster.svg")
+    if os.path.exists(user_icon):
+        return "clipmaster"
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "clipmaster.svg"))
+
 
 POPULAR_SHORTCUTS = [
     ("<Super>v", "Win + V (Mặc định)"),
@@ -260,28 +280,37 @@ def remove_super_v_shortcut() -> bool:
 
 def setup_desktop_entry() -> bool:
     """Create .desktop launcher in ~/.local/share/applications/"""
+    install_user_icon()
     app_dir = os.path.expanduser("~/.local/share/applications")
     os.makedirs(app_dir, exist_ok=True)
     icon_path = get_icon_path_or_name()
     exec_cmd = f"{get_clipmaster_command()} --toggle"
     desktop_file = os.path.join(app_dir, "clipmaster.desktop")
+    alt_file = os.path.join(app_dir, "com.clipmaster.ClipMaster.desktop")
 
     content = f"""[Desktop Entry]
 Name=ClipMaster
 GenericName=Clipboard Manager
-Comment=Trình quản lý lịch sử sao chép tương tự Win + V
+GenericName[vi]=Trình quản lý Clipboard
+Comment=Windows + V style Clipboard History Manager for Linux
+Comment[vi]=Quản lý lịch sử sao chép clipboard giống Windows + V
 Exec={exec_cmd}
 Icon={icon_path}
 Terminal=false
 Type=Application
 Categories=Utility;Accessories;
-Keywords=clipboard;paste;copy;history;win+v;
+Keywords=clipboard;paste;copy;history;win+v;clipmaster;
 StartupNotify=false
+StartupWMClass=clipmaster
 """
     try:
         with open(desktop_file, "w", encoding="utf-8") as f:
             f.write(content)
+        with open(alt_file, "w", encoding="utf-8") as f:
+            f.write(content)
         os.chmod(desktop_file, 0o755)
+        os.chmod(alt_file, 0o755)
+        subprocess.run(["update-desktop-database", "-q", app_dir], capture_output=True)
         return True
     except Exception as e:
         print(f"Error creating desktop entry: {e}")
