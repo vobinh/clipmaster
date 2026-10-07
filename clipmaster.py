@@ -126,6 +126,14 @@ class ClipMasterApplication(Adw.Application):
         # Start IPC socket server for single-instance commands
         self.ipc_server = start_ipc_server(self._handle_ipc_command)
 
+        # Ensure global shortcut (Win + V by default) is configured on startup
+        try:
+            if not get_current_shortcut():
+                install_super_v_shortcut()
+                self.db.set_setting("shortcut", "<Super>v")
+        except Exception as e:
+            print(f"Notice: Could not auto-install default shortcut: {e}")
+
         # Hold application so it continues running in background
         if not self._is_held:
             self.hold()

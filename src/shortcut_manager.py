@@ -45,34 +45,70 @@ POPULAR_SHORTCUTS = [
 
 
 def get_current_custom_keybindings() -> list:
+    # 1. Try dconf first (works in Snap and does not require compiled schemas)
+    try:
+        res = subprocess.run(
+            ["dconf", "read", "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"],
+            capture_output=True, text=True
+        )
+        if res.returncode == 0:
+            raw = res.stdout.strip()
+            if raw.startswith("@as "):
+                raw = raw[4:]
+            if not raw or raw == "[]":
+                return []
+            return ast.literal_eval(raw)
+    except Exception:
+        pass
+
+    # 2. Fallback to gsettings
     try:
         res = subprocess.run(
             ["gsettings", "get", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings"],
-            capture_output=True, text=True, check=True
+            capture_output=True, text=True
         )
-        raw = res.stdout.strip()
-        if raw.startswith("@as "):
-            raw = raw[4:]
-        return ast.literal_eval(raw)
+        if res.returncode == 0:
+            raw = res.stdout.strip()
+            if raw.startswith("@as "):
+                raw = raw[4:]
+            if not raw or raw == "[]":
+                return []
+            return ast.literal_eval(raw)
     except Exception as e:
         print(f"Error reading custom-keybindings: {e}")
-        return []
+    return []
 
 
 def get_current_shortcut() -> str:
-    """Read the currently configured shortcut from gsettings."""
+    """Read the currently configured shortcut from dconf or gsettings."""
+    # 1. Try dconf first
+    try:
+        res = subprocess.run(
+            ["dconf", "read", f"{CUSTOM_PATH}binding"],
+            capture_output=True, text=True
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            val = res.stdout.strip().replace("'", "").replace('"', "")
+            if val:
+                return val
+    except Exception:
+        pass
+
+    # 2. Fallback to gsettings
     try:
         bindings = get_current_custom_keybindings()
-        if CUSTOM_PATH not in bindings:
-            return ""
-        res = subprocess.run(
-            ["gsettings", "get", CUSTOM_SCHEMA, "binding"],
-            capture_output=True, text=True, check=True
-        )
-        val = res.stdout.strip().replace("'", "").replace('"', "")
-        return val
+        if CUSTOM_PATH in bindings:
+            res = subprocess.run(
+                ["gsettings", "get", CUSTOM_SCHEMA, "binding"],
+                capture_output=True, text=True
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                val = res.stdout.strip().replace("'", "").replace('"', "")
+                return val
     except Exception:
-        return ""
+        pass
+
+    return ""
 
 
 def is_shortcut_installed() -> bool:
@@ -113,43 +149,76 @@ def set_custom_shortcut(shortcut_str: str) -> bool:
     """
     Registers a given shortcut string to open ClipMaster,
     and resolves GNOME default conflicts if necessary.
+    Uses dconf (primary) with gsettings fallback.
     """
     if not shortcut_str:
         return remove_super_v_shortcut()
 
-    try:
-        # 1. If using <Super>v, unbind from GNOME's toggle-message-tray
-        if "<super>v" in shortcut_str.lower():
-            res = subprocess.run(
-                ["gsettings", "get", "org.gnome.shell.keybindings", "toggle-message-tray"],
-                capture_output=True, text=True
-            )
-            if "<Super>v" in res.stdout or "<super>v" in res.stdout:
-                subprocess.run(
-                    ["gsettings", "set", "org.gnome.shell.keybindings", "toggle-message-tray", "['<Super>m']"],
-                    check=True
-                )
+    exec_cmd = f"{get_clipmaster_command()} --toggle"
+    display_name = f"ClipMaster ({format_shortcut_display(shortcut_str)})"
+    success = False
 
-        # 2. Add custom keybinding path to list if missing
-        bindings = get_current_custom_keybindings()
-        if CUSTOM_PATH not in bindings:
-            bindings.append(CUSTOM_PATH)
+    # 1. Resolve GNOME <Super>v conflict with toggle-message-tray
+    if "<super>v" in shortcut_str.lower():
+        try:
             subprocess.run(
-                ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", str(bindings)],
-                check=True
+                ["dconf", "write", "/org/gnome/shell/keybindings/toggle-message-tray", "['<Super>m']"],
+                capture_output=True
             )
+        except Exception:
+            pass
+        try:
+            subprocess.run(
+                ["gsettings", "set", "org.gnome.shell.keybindings", "toggle-message-tray", "['<Super>m']"],
+                capture_output=True
+            )
+        except Exception:
+            pass
 
-        # 3. Configure shortcut parameters
-        exec_cmd = f"{get_clipmaster_command()} --toggle"
-        display_name = f"ClipMaster ({format_shortcut_display(shortcut_str)})"
-        subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "name", display_name], check=True)
-        subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "command", exec_cmd], check=True)
-        subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "binding", shortcut_str], check=True)
+    # 2. Add custom keybinding path to list
+    bindings = get_current_custom_keybindings()
+    if CUSTOM_PATH not in bindings:
+        bindings.append(CUSTOM_PATH)
+    bindings_repr = str(bindings)
 
-        return True
+    # 3. Write via dconf
+    try:
+        r1 = subprocess.run(
+            ["dconf", "write", "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings", bindings_repr],
+            capture_output=True
+        )
+        r2 = subprocess.run(
+            ["dconf", "write", f"{CUSTOM_PATH}name", f"'{display_name}'"],
+            capture_output=True
+        )
+        r3 = subprocess.run(
+            ["dconf", "write", f"{CUSTOM_PATH}command", f"'{exec_cmd}'"],
+            capture_output=True
+        )
+        r4 = subprocess.run(
+            ["dconf", "write", f"{CUSTOM_PATH}binding", f"'{shortcut_str}'"],
+            capture_output=True
+        )
+        if r1.returncode == 0 and r2.returncode == 0 and r3.returncode == 0 and r4.returncode == 0:
+            success = True
     except Exception as e:
-        print(f"Failed to set custom shortcut: {e}")
-        return False
+        print(f"dconf set failed: {e}")
+
+    # 4. Also sync via gsettings if available
+    try:
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", bindings_repr],
+            capture_output=True
+        )
+        subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "name", display_name], capture_output=True)
+        subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "command", exec_cmd], capture_output=True)
+        r = subprocess.run(["gsettings", "set", CUSTOM_SCHEMA, "binding", shortcut_str], capture_output=True)
+        if r.returncode == 0:
+            success = True
+    except Exception:
+        pass
+
+    return success
 
 
 def install_super_v_shortcut() -> bool:
@@ -158,19 +227,35 @@ def install_super_v_shortcut() -> bool:
 
 
 def remove_super_v_shortcut() -> bool:
+    bindings = get_current_custom_keybindings()
+    if CUSTOM_PATH in bindings:
+        bindings.remove(CUSTOM_PATH)
+    bindings_repr = str(bindings)
+
+    # Reset via dconf
     try:
-        bindings = get_current_custom_keybindings()
-        if CUSTOM_PATH in bindings:
-            bindings.remove(CUSTOM_PATH)
-            subprocess.run(
-                ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", str(bindings)],
-                check=True
-            )
-        subprocess.run(["gsettings", "reset-recursively", CUSTOM_SCHEMA])
-        return True
-    except Exception as e:
-        print(f"Failed to remove shortcut: {e}")
-        return False
+        subprocess.run(
+            ["dconf", "write", "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings", bindings_repr],
+            capture_output=True
+        )
+        subprocess.run(
+            ["dconf", "reset", "-f", CUSTOM_PATH],
+            capture_output=True
+        )
+    except Exception:
+        pass
+
+    # Reset via gsettings
+    try:
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", bindings_repr],
+            capture_output=True
+        )
+        subprocess.run(["gsettings", "reset-recursively", CUSTOM_SCHEMA], capture_output=True)
+    except Exception:
+        pass
+
+    return True
 
 
 def setup_desktop_entry() -> bool:

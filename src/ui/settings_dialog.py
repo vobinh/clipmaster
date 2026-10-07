@@ -258,7 +258,7 @@ class SettingsDialog(Adw.PreferencesWindow):
             self.on_settings_changed()
 
     def _update_shortcut_row_subtitle(self):
-        current = get_current_shortcut()
+        current = get_current_shortcut() or self.db.get_setting("shortcut", "<Super>v")
         if current:
             disp = format_shortcut_display(current)
             lbl = "Shortcut" if self.lang == "en" else "Tổ hợp phím"
@@ -270,7 +270,7 @@ class SettingsDialog(Adw.PreferencesWindow):
 
     def _sync_preset_selection(self):
         self._updating_combo = True
-        current = get_current_shortcut()
+        current = get_current_shortcut() or self.db.get_setting("shortcut", "<Super>v")
         matched = False
         for idx, (key, _) in enumerate(POPULAR_SHORTCUTS):
             if key.lower() == current.lower():
@@ -292,7 +292,7 @@ class SettingsDialog(Adw.PreferencesWindow):
             self._open_shortcut_record_dialog(None)
 
     def _open_shortcut_record_dialog(self, btn):
-        current = get_current_shortcut()
+        current = get_current_shortcut() or self.db.get_setting("shortcut", "<Super>v")
         dialog = ShortcutRecordDialog(
             parent_window=self,
             current_shortcut=current,
@@ -302,11 +302,11 @@ class SettingsDialog(Adw.PreferencesWindow):
         dialog.present()
 
     def _apply_new_shortcut(self, shortcut_str: str):
-        success = set_custom_shortcut(shortcut_str)
-        if success:
-            self.db.set_setting("shortcut", shortcut_str)
-            self._update_shortcut_row_subtitle()
-            self._sync_preset_selection()
+        set_custom_shortcut(shortcut_str)
+        self.db.set_setting("shortcut", shortcut_str)
+        self._update_shortcut_row_subtitle()
+        self._sync_preset_selection()
+        if self.on_settings_changed:
             self.on_settings_changed()
 
     def _on_auto_record_toggled(self, switch, gparam):

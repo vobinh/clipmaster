@@ -57,6 +57,9 @@ parts:
       - xdotool
       - xsel
       - sqlite3
+      - dconf-cli
+      - gnome-settings-daemon-common
+      - gnome-shell-common
     organize:
       assets/icon.svg: usr/share/icons/hicolor/scalable/apps/clipmaster.svg
     prime:
