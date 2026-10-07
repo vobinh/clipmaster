@@ -46,20 +46,6 @@ apps:
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
 
-  daemon:
-    command: bin/clipmaster --daemon
-    daemon: simple
-    extensions: [gnome]
-    plugs:
-      - desktop
-      - desktop-legacy
-      - wayland
-      - x11
-      - gsettings
-      - home
-      - unity7
-    environment:
-      PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
 
 parts:
   clipmaster:

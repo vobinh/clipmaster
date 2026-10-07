@@ -21,7 +21,9 @@ CUSTOM_SCHEMA = f"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding
 
 
 def get_clipmaster_command() -> str:
-    """Return executable command: system binary if installed via .deb or local python script."""
+    """Return executable command: system binary if installed via snap/deb or local python script."""
+    if os.path.exists("/snap/bin/clipmaster"):
+        return "/snap/bin/clipmaster"
     if os.path.exists("/usr/bin/clipmaster"):
         return "/usr/bin/clipmaster"
     return f"python3 {CLIPMASTER_PATH}"

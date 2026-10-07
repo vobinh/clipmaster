@@ -94,10 +94,9 @@ class ClipMasterApplication(Adw.Application):
     def __init__(self):
         in_snap = "SNAP" in os.environ
         app_id = None if in_snap else "com.clipmaster.ClipMaster"
-        flags = Gio.ApplicationFlags.FLAGS_NONE if in_snap else Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         super().__init__(
             application_id=app_id,
-            flags=flags
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         )
         self.db = Database()
         self.clipboard_mgr = None
@@ -110,7 +109,6 @@ class ClipMasterApplication(Adw.Application):
                 self.register(None)
             except GLib.GError:
                 self.set_application_id(None)
-                self.set_flags(Gio.ApplicationFlags.FLAGS_NONE)
                 self.register(None)
 
     def do_startup(self):
@@ -384,8 +382,9 @@ def main():
     if handle_cli_direct(sys.argv):
         sys.exit(0)
 
-    # If --toggle is requested, check if already running instance can handle it
-    if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
+    # If --toggle or default launch is requested, delegate to running instance if one exists
+    is_toggle_req = (len(sys.argv) <= 1) or (len(sys.argv) > 1 and sys.argv[1] == "--toggle")
+    if is_toggle_req:
         if send_ipc_command("toggle"):
             sys.exit(0)
 
