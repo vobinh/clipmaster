@@ -5,6 +5,8 @@ ClipMaster - Trình quản lý lịch sử sao chép giống Windows + V trên U
 
 import os
 import sys
+import socket
+import threading
 
 # Ensure local src package is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,25 +32,86 @@ from src.shortcut_manager import (
 )
 
 
+def get_ipc_socket_path():
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", os.path.expanduser("~/.local/share/clipmaster"))
+    return os.path.join(runtime_dir, "clipmaster_ipc.sock")
+
+
+def send_ipc_command(cmd: str) -> bool:
+    """Send command to running instance if one exists. Returns True if handled."""
+    sock_path = get_ipc_socket_path()
+    if not os.path.exists(sock_path):
+        return False
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.8)
+            client.connect(sock_path)
+            client.sendall(f"{cmd}\n".encode())
+            resp = client.recv(1024)
+            return resp.strip() == b"OK"
+    except Exception:
+        try:
+            os.unlink(sock_path)
+        except OSError:
+            pass
+        return False
+
+
+def start_ipc_server(on_command_callback):
+    """Start background socket listener for CLI / IPC commands."""
+    sock_path = get_ipc_socket_path()
+    if os.path.exists(sock_path):
+        try:
+            os.unlink(sock_path)
+        except OSError:
+            pass
+
+    try:
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(sock_path)
+        server.listen(5)
+    except Exception:
+        return None
+
+    def listen_loop():
+        while True:
+            try:
+                conn, _ = server.accept()
+                with conn:
+                    data = conn.recv(1024).decode().strip()
+                    if data:
+                        on_command_callback(data)
+                    conn.sendall(b"OK\n")
+            except Exception:
+                break
+
+    t = threading.Thread(target=listen_loop, daemon=True)
+    t.start()
+    return server
+
+
 class ClipMasterApplication(Adw.Application):
     def __init__(self):
-        app_id = "snap.clipmaster" if "SNAP" in os.environ else "com.clipmaster.ClipMaster"
+        in_snap = "SNAP" in os.environ
+        app_id = None if in_snap else "com.clipmaster.ClipMaster"
+        flags = Gio.ApplicationFlags.FLAGS_NONE if in_snap else Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         super().__init__(
             application_id=app_id,
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
+            flags=flags
         )
         self.db = Database()
         self.clipboard_mgr = None
         self.window = None
         self._is_held = False
+        self.ipc_server = None
 
-        # Attempt DBus registration; fallback to local mode if restricted by AppArmor/sandbox
-        try:
-            self.register(None)
-        except GLib.GError:
-            self.set_application_id(None)
-            self.set_flags(Gio.ApplicationFlags.FLAGS_NONE)
-            self.register(None)
+        if not in_snap:
+            try:
+                self.register(None)
+            except GLib.GError:
+                self.set_application_id(None)
+                self.set_flags(Gio.ApplicationFlags.FLAGS_NONE)
+                self.register(None)
 
     def do_startup(self):
         Adw.Application.do_startup(self)
@@ -62,10 +125,28 @@ class ClipMasterApplication(Adw.Application):
         )
         self.clipboard_mgr.start_monitoring()
 
+        # Start IPC socket server for single-instance commands
+        self.ipc_server = start_ipc_server(self._handle_ipc_command)
+
         # Hold application so it continues running in background
         if not self._is_held:
             self.hold()
             self._is_held = True
+
+    def _handle_ipc_command(self, cmd: str):
+        if cmd == "toggle":
+            GLib.idle_add(self._toggle_from_ipc)
+        elif cmd == "clear":
+            self.db.clear_unpinned()
+            if self.window:
+                GLib.idle_add(self.window.reload_history)
+        elif cmd == "reload":
+            if self.window:
+                GLib.idle_add(self.window.reload_history)
+
+    def _toggle_from_ipc(self):
+        self._ensure_window()
+        self.window.toggle_visibility()
 
     def do_activate(self):
         self._ensure_window()
@@ -302,6 +383,11 @@ def handle_cli_direct(args):
 def main():
     if handle_cli_direct(sys.argv):
         sys.exit(0)
+
+    # If --toggle is requested, check if already running instance can handle it
+    if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
+        if send_ipc_command("toggle"):
+            sys.exit(0)
 
     app = ClipMasterApplication()
     exit_status = app.run(sys.argv)

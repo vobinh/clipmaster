@@ -43,8 +43,6 @@ apps:
       - gsettings
       - home
       - unity7
-    slots:
-      - clipmaster-slot
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
 
@@ -60,16 +58,8 @@ apps:
       - gsettings
       - home
       - unity7
-    slots:
-      - clipmaster-slot
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
-
-slots:
-  clipmaster-slot:
-    interface: dbus
-    bus: session
-    name: snap.clipmaster
 
 parts:
   clipmaster:
