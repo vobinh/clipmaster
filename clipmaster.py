@@ -32,14 +32,23 @@ from src.shortcut_manager import (
 
 class ClipMasterApplication(Adw.Application):
     def __init__(self):
+        app_id = "snap.clipmaster" if "SNAP" in os.environ else "com.clipmaster.ClipMaster"
         super().__init__(
-            application_id="com.clipmaster.ClipMaster",
+            application_id=app_id,
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         )
         self.db = Database()
         self.clipboard_mgr = None
         self.window = None
         self._is_held = False
+
+        # Attempt DBus registration; fallback to local mode if restricted by AppArmor/sandbox
+        try:
+            self.register(None)
+        except GLib.GError:
+            self.set_application_id(None)
+            self.set_flags(Gio.ApplicationFlags.FLAGS_NONE)
+            self.register(None)
 
     def do_startup(self):
         Adw.Application.do_startup(self)

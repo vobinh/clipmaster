@@ -129,7 +129,7 @@ class MainWindow(Adw.ApplicationWindow):
         # 2. Search Entry
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.add_css_class("search-bar")
-        self.search_entry.set_placeholder_text(t("search_placeholder", self.lang))
+        self._set_search_placeholder(t("search_placeholder", self.lang))
         self.search_entry.connect("search-changed", self._on_search_changed)
         main_box.append(self.search_entry)
 
@@ -270,10 +270,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_query = entry.get_text()
         self.reload_history()
 
+    def _set_search_placeholder(self, text: str):
+        if hasattr(self.search_entry, "set_placeholder_text"):
+            self.search_entry.set_placeholder_text(text)
+        else:
+            self.search_entry.set_property("placeholder-text", text)
+
     def _update_localized_texts(self):
         """Update all static labels when language is changed."""
         self.title_widget.set_subtitle(t("app_subtitle", self.lang))
-        self.search_entry.set_placeholder_text(t("search_placeholder", self.lang))
+        self._set_search_placeholder(t("search_placeholder", self.lang))
         self.settings_btn.set_tooltip_text(t("tooltip_settings", self.lang))
         self.clear_btn.set_tooltip_text(t("tooltip_clear", self.lang))
         self.pause_lbl.set_text(t("pause_banner_text", self.lang))

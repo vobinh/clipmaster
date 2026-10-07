@@ -43,6 +43,8 @@ apps:
       - gsettings
       - home
       - unity7
+    slots:
+      - clipmaster-slot
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
 
@@ -58,8 +60,16 @@ apps:
       - gsettings
       - home
       - unity7
+    slots:
+      - clipmaster-slot
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages:$SNAP/lib/python3.10/site-packages:$SNAP:$PYTHONPATH
+
+slots:
+  clipmaster-slot:
+    interface: dbus
+    bus: session
+    name: snap.clipmaster
 
 parts:
   clipmaster:
@@ -68,8 +78,6 @@ parts:
     stage-packages:
       - python3
       - python3-gi
-      - gir1.2-gtk-4.0
-      - gir1.2-adw-1
       - xdotool
       - xsel
       - sqlite3
