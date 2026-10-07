@@ -1,0 +1,339 @@
+"""
+ClipMaster Settings Dialog
+Preferences configuration for shortcuts, autostart, history limits, and language.
+"""
+
+from typing import Callable
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, Adw, GLib
+
+from ..database import Database
+from ..shortcut_manager import (
+    get_current_shortcut,
+    set_custom_shortcut,
+    remove_super_v_shortcut,
+    format_shortcut_display,
+    is_shortcut_installed,
+    is_autostart_enabled,
+    setup_autostart,
+    POPULAR_SHORTCUTS
+)
+from ..i18n import t, AVAILABLE_LANGUAGES
+from ..theme_manager import apply_theme_mode, THEME_MODES
+from .shortcut_dialog import ShortcutRecordDialog
+
+
+class SettingsDialog(Adw.PreferencesWindow):
+    def __init__(self, parent_window: Gtk.Window, db: Database, on_settings_changed: Callable):
+        super().__init__()
+        self.set_transient_for(parent_window)
+        self.set_modal(True)
+        self.set_default_size(500, 580)
+
+        self.db = db
+        self.on_settings_changed = on_settings_changed
+        self.lang = self.db.get_setting("language", "vi")
+        self._updating_combo = False
+        self._updating_lang = False
+        self._updating_theme = False
+
+        self._build_ui()
+        self._update_localized_texts()
+
+    def _build_ui(self):
+        # Only create a single page once
+        self.page = Adw.PreferencesPage()
+        self.page.set_icon_name("preferences-system-symbolic")
+
+        # --- Group 0: Giao diện / Appearance & Theme ---
+        self.group_appearance = Adw.PreferencesGroup()
+
+        self.theme_row = Adw.ComboRow()
+        self._updating_theme = True
+        theme_names = [t(k, self.lang) for _, k in THEME_MODES]
+        self.theme_row.set_model(Gtk.StringList.new(theme_names))
+        cur_theme = self.db.get_setting("theme_mode", "dark")
+        theme_indices = {"system": 0, "dark": 1, "light": 2}
+        self.theme_row.set_selected(theme_indices.get(cur_theme, 1))
+        self._updating_theme = False
+        self.theme_row.connect("notify::selected", self._on_theme_changed)
+
+        self.group_appearance.add(self.theme_row)
+        self.page.add(self.group_appearance)
+
+        # --- Group 1: Ngôn ngữ / Language ---
+        self.group_lang = Adw.PreferencesGroup()
+
+        self.lang_row = Adw.ComboRow()
+        lang_model = Gtk.StringList.new([name for _, name in AVAILABLE_LANGUAGES])
+        self.lang_row.set_model(lang_model)
+
+        self._updating_lang = True
+        self.lang_row.set_selected(1 if self.lang == "en" else 0)
+        self._updating_lang = False
+        self.lang_row.connect("notify::selected", self._on_language_changed)
+
+        self.group_lang.add(self.lang_row)
+        self.page.add(self.group_lang)
+
+        # --- Group 1: Phím tắt hệ thống ---
+        self.group_shortcut = Adw.PreferencesGroup()
+
+        # Current Shortcut Row
+        self.shortcut_row = Adw.ActionRow()
+
+        # Change button
+        self.change_shortcut_btn = Gtk.Button()
+        self.change_shortcut_btn.add_css_class("suggested-action")
+        self.change_shortcut_btn.set_valign(Gtk.Align.CENTER)
+        self.change_shortcut_btn.connect("clicked", self._open_shortcut_record_dialog)
+        self.shortcut_row.add_suffix(self.change_shortcut_btn)
+
+        self.group_shortcut.add(self.shortcut_row)
+
+        # Quick Preset ComboRow
+        self.preset_row = Adw.ComboRow()
+        self.preset_row.connect("notify::selected", self._on_preset_selected)
+
+        self.group_shortcut.add(self.preset_row)
+        self.page.add(self.group_shortcut)
+
+        # --- Group 2: Trải nghiệm & Tác vụ ---
+        self.group_behavior = Adw.PreferencesGroup()
+
+        # Auto Record Switch (Tự động ghi nhớ)
+        self.auto_record_row = Adw.ActionRow()
+        self.auto_record_switch = Gtk.Switch()
+        self.auto_record_switch.set_valign(Gtk.Align.CENTER)
+        self.auto_record_switch.set_active(self.db.get_setting("auto_record", "1") == "1")
+        self.auto_record_switch.connect("notify::active", self._on_auto_record_toggled)
+        self.auto_record_row.add_suffix(self.auto_record_switch)
+        self.group_behavior.add(self.auto_record_row)
+
+        # Auto Paste Switch
+        self.auto_paste_row = Adw.ActionRow()
+        self.auto_paste_switch = Gtk.Switch()
+        self.auto_paste_switch.set_valign(Gtk.Align.CENTER)
+        self.auto_paste_switch.set_active(self.db.get_setting("auto_paste", "1") == "1")
+        self.auto_paste_switch.connect("notify::active", self._on_auto_paste_toggled)
+        self.auto_paste_row.add_suffix(self.auto_paste_switch)
+        self.group_behavior.add(self.auto_paste_row)
+
+        # Save Images Switch
+        self.images_row = Adw.ActionRow()
+        self.images_switch = Gtk.Switch()
+        self.images_switch.set_valign(Gtk.Align.CENTER)
+        self.images_switch.set_active(self.db.get_setting("save_images", "1") == "1")
+        self.images_switch.connect("notify::active", self._on_save_images_toggled)
+        self.images_row.add_suffix(self.images_switch)
+        self.group_behavior.add(self.images_row)
+
+        # Autostart on boot
+        self.autostart_row = Adw.ActionRow()
+        self.autostart_switch = Gtk.Switch()
+        self.autostart_switch.set_valign(Gtk.Align.CENTER)
+        self.autostart_switch.set_active(is_autostart_enabled())
+        self.autostart_switch.connect("notify::active", self._on_autostart_toggled)
+        self.autostart_row.add_suffix(self.autostart_switch)
+        self.group_behavior.add(self.autostart_row)
+
+        self.page.add(self.group_behavior)
+
+        # --- Group 3: Giới hạn lưu trữ ---
+        self.group_storage = Adw.PreferencesGroup()
+
+        self.limit_row = Adw.ComboRow()
+        cur_limit = self.db.get_setting("max_history", "200")
+        mapping = {"50": 0, "100": 1, "200": 2, "500": 3, "1000": 4}
+        self.limit_row.set_selected(mapping.get(cur_limit, 2))
+        self.limit_row.connect("notify::selected", self._on_limit_changed)
+        self.group_storage.add(self.limit_row)
+
+        self.page.add(self.group_storage)
+
+        # --- Group 4: Vùng nguy hiểm ---
+        self.group_danger = Adw.PreferencesGroup()
+
+        self.clear_all_row = Adw.ActionRow()
+        self.clear_btn = Gtk.Button()
+        self.clear_btn.add_css_class("destructive-action")
+        self.clear_btn.set_valign(Gtk.Align.CENTER)
+        self.clear_btn.connect("clicked", self._on_clear_unpinned)
+        self.clear_all_row.add_suffix(self.clear_btn)
+        self.group_danger.add(self.clear_all_row)
+
+        self.page.add(self.group_danger)
+
+        self.add(self.page)
+
+    def _update_localized_texts(self):
+        """Update all labels and descriptions in place without adding new pages/tabs."""
+        self.set_title(t("settings_title", self.lang))
+        self.page.set_title(t("page_general", self.lang))
+
+        # Appearance Group
+        self.group_appearance.set_title(t("group_appearance", self.lang))
+        self.theme_row.set_title(t("row_theme", self.lang))
+        self.theme_row.set_subtitle(t("row_theme_sub", self.lang))
+        self._updating_theme = True
+        theme_names = [t(k, self.lang) for _, k in THEME_MODES]
+        cur_theme_sel = self.theme_row.get_selected()
+        self.theme_row.set_model(Gtk.StringList.new(theme_names))
+        self.theme_row.set_selected(cur_theme_sel)
+        self._updating_theme = False
+
+        # Language Group
+        self.group_lang.set_title(t("group_language", self.lang))
+        self.lang_row.set_title(t("row_language", self.lang))
+        self.lang_row.set_subtitle(t("row_language_sub", self.lang))
+
+        # Shortcut Group
+        self.group_shortcut.set_title(t("group_shortcut", self.lang))
+        self.group_shortcut.set_description(t("group_shortcut_desc", self.lang))
+        self.shortcut_row.set_title(t("row_active_shortcut", self.lang))
+        self.change_shortcut_btn.set_label(t("btn_change_shortcut", self.lang))
+        self._update_shortcut_row_subtitle()
+
+        self.preset_row.set_title(t("row_preset", self.lang))
+        self.preset_row.set_subtitle(t("row_preset_sub", self.lang))
+
+        # Update preset options
+        self._updating_combo = True
+        preset_labels = [label for _, label in POPULAR_SHORTCUTS] + [t("custom_option", self.lang)]
+        self.preset_row.set_model(Gtk.StringList.new(preset_labels))
+        self._sync_preset_selection()
+        self._updating_combo = False
+
+        # Behavior Group
+        self.group_behavior.set_title(t("group_behavior", self.lang))
+        self.auto_record_row.set_title(t("row_auto_record", self.lang))
+        self.auto_record_row.set_subtitle(t("row_auto_record_sub", self.lang))
+        self.auto_paste_row.set_title(t("row_auto_paste", self.lang))
+        self.auto_paste_row.set_subtitle(t("row_auto_paste_sub", self.lang))
+        self.images_row.set_title(t("row_save_images", self.lang))
+        self.images_row.set_subtitle(t("row_save_images_sub", self.lang))
+        self.autostart_row.set_title(t("row_autostart", self.lang))
+        self.autostart_row.set_subtitle(t("row_autostart_sub", self.lang))
+
+        # Storage Group
+        self.group_storage.set_title(t("group_storage", self.lang))
+        self.limit_row.set_title(t("row_max_items", self.lang))
+        self.limit_row.set_subtitle(t("row_max_items_sub", self.lang))
+        unit = "items" if self.lang == "en" else "mục"
+        limit_options = [f"50 {unit}", f"100 {unit}", f"200 {unit}", f"500 {unit}", f"1000 {unit}"]
+        cur_sel = self.limit_row.get_selected()
+        self.limit_row.set_model(Gtk.StringList.new(limit_options))
+        self.limit_row.set_selected(cur_sel)
+
+        # Danger Group
+        self.group_danger.set_title(t("group_danger", self.lang))
+        self.clear_all_row.set_title(t("row_clear_all", self.lang))
+        self.clear_all_row.set_subtitle(t("row_clear_all_sub", self.lang))
+        self.clear_btn.set_label(t("btn_clear_now", self.lang))
+
+    def _on_theme_changed(self, combo, gparam):
+        if self._updating_theme:
+            return
+        idx = combo.get_selected()
+        if 0 <= idx < len(THEME_MODES):
+            new_mode = THEME_MODES[idx][0]
+            self.db.set_setting("theme_mode", new_mode)
+            apply_theme_mode(new_mode)
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+    def _on_language_changed(self, combo, gparam):
+        if self._updating_lang:
+            return
+        idx = combo.get_selected()
+        new_lang = AVAILABLE_LANGUAGES[idx][0] if 0 <= idx < len(AVAILABLE_LANGUAGES) else "vi"
+        if new_lang != self.lang:
+            self.lang = new_lang
+            self.db.set_setting("language", new_lang)
+            # Update all labels in place without touching pages or tabs!
+            self._update_localized_texts()
+            self.on_settings_changed()
+
+    def _update_shortcut_row_subtitle(self):
+        current = get_current_shortcut()
+        if current:
+            disp = format_shortcut_display(current)
+            lbl = "Shortcut" if self.lang == "en" else "Tổ hợp phím"
+            disp_esc = GLib.markup_escape_text(disp)
+            cur_esc = GLib.markup_escape_text(current)
+            self.shortcut_row.set_subtitle(f"{lbl}: {disp_esc} ({cur_esc})")
+        else:
+            self.shortcut_row.set_subtitle("Not configured" if self.lang == "en" else "Chưa được kích hoạt")
+
+    def _sync_preset_selection(self):
+        self._updating_combo = True
+        current = get_current_shortcut()
+        matched = False
+        for idx, (key, _) in enumerate(POPULAR_SHORTCUTS):
+            if key.lower() == current.lower():
+                self.preset_row.set_selected(idx)
+                matched = True
+                break
+        if not matched:
+            self.preset_row.set_selected(len(POPULAR_SHORTCUTS))
+        self._updating_combo = False
+
+    def _on_preset_selected(self, combo, gparam):
+        if self._updating_combo:
+            return
+        idx = combo.get_selected()
+        if idx < len(POPULAR_SHORTCUTS):
+            key, label = POPULAR_SHORTCUTS[idx]
+            self._apply_new_shortcut(key)
+        else:
+            self._open_shortcut_record_dialog(None)
+
+    def _open_shortcut_record_dialog(self, btn):
+        current = get_current_shortcut()
+        dialog = ShortcutRecordDialog(
+            parent_window=self,
+            current_shortcut=current,
+            on_saved=self._apply_new_shortcut,
+            lang=self.lang
+        )
+        dialog.present()
+
+    def _apply_new_shortcut(self, shortcut_str: str):
+        success = set_custom_shortcut(shortcut_str)
+        if success:
+            self.db.set_setting("shortcut", shortcut_str)
+            self._update_shortcut_row_subtitle()
+            self._sync_preset_selection()
+            self.on_settings_changed()
+
+    def _on_auto_record_toggled(self, switch, gparam):
+        val = "1" if switch.get_active() else "0"
+        self.db.set_setting("auto_record", val)
+        self.on_settings_changed()
+
+    def _on_auto_paste_toggled(self, switch, gparam):
+        val = "1" if switch.get_active() else "0"
+        self.db.set_setting("auto_paste", val)
+        self.on_settings_changed()
+
+    def _on_save_images_toggled(self, switch, gparam):
+        val = "1" if switch.get_active() else "0"
+        self.db.set_setting("save_images", val)
+        self.on_settings_changed()
+
+    def _on_autostart_toggled(self, switch, gparam):
+        setup_autostart(switch.get_active())
+
+    def _on_limit_changed(self, combo, gparam):
+        vals = ["50", "100", "200", "500", "1000"]
+        idx = combo.get_selected()
+        if 0 <= idx < len(vals):
+            self.db.set_setting("max_history", vals[idx])
+            self.on_settings_changed()
+
+    def _on_clear_unpinned(self, btn):
+        self.db.clear_unpinned()
+        self.on_settings_changed()

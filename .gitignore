@@ -1,0 +1,29 @@
+# Debian packaging & build artifacts
+*.deb
+build/
+dist/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Local databases & logs
+*.db
+*.sqlite3
+*.log
+
+# IDE & editor files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
