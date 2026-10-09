@@ -1008,21 +1008,51 @@ body {
   border-color: var(--accent);
 }
 
-/* PIN Dialog Modal */
+/* PIN Dialog Modal Refinement */
 .pin-dialog-card {
   width: 90%;
-  max-width: 360px;
+  max-width: 380px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+[data-theme="light"] .pin-dialog-card {
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.15);
 }
 
 .pin-dialog-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.pin-dialog-icon {
-  font-size: 18px;
+.pin-header-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
   color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.modal-subtitle {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.pin-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
 }
 
 .pin-modal-error {
@@ -1056,53 +1086,182 @@ body {
   40%, 80% { transform: translateX(4px); }
 }
 
-.pin-input-peek-wrapper {
-  position: relative;
+.pin-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pin-field-label {
   display: flex;
   align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
 }
 
-.pin-digit-input {
-  letter-spacing: 4px;
-  padding-right: 36px !important;
-  font-size: 14px;
+.pin-field-label i {
+  font-size: 13px;
+  color: var(--accent);
 }
 
+/* Standalone Input Control (Current PIN) */
+.pin-input-control {
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 2px 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pin-input-control:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-surface);
+}
+
+/* Unified Paired Panel (New PIN + Confirm PIN) */
+.pin-unified-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pin-unified-panel:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-surface);
+}
+
+.pin-input-row {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  transition: background 0.15s ease;
+}
+
+.pin-input-row:focus-within {
+  background: var(--bg-surface);
+}
+
+.pin-row-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0 8px;
+}
+
+.pin-input-prefix {
+  width: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.pin-input-row:focus-within .pin-input-prefix,
+.pin-input-control:focus-within .pin-input-prefix {
+  color: var(--accent);
+}
+
+/* PIN Field Input */
+.pin-field-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  padding: 10px 8px;
+  height: 42px;
+  box-sizing: border-box;
+  letter-spacing: normal;
+  transition: letter-spacing 0.1s ease;
+}
+
+.pin-field-input::placeholder {
+  font-family: var(--font-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+  color: var(--text-tertiary) !important;
+  opacity: 0.85;
+}
+
+.pin-field-input:not(:placeholder-shown) {
+  font-family: var(--font-mono) !important;
+  letter-spacing: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Peek Eye Toggle Button */
+.pin-peek-btn,
 .btn-peek {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
   background: transparent;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: color 0.15s;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
+.pin-peek-btn:hover,
 .btn-peek:hover {
   color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
-.pin-dialog-hint {
+.pin-peek-btn:active,
+.btn-peek:active {
+  transform: scale(0.92);
+}
+
+/* Hint Card */
+.pin-dialog-hint-card {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  font-size: 10.5px;
-  color: var(--text-tertiary);
+  gap: 8px;
+  background: var(--accent-subtle);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
   line-height: 1.45;
-  margin-top: 4px;
 }
 
-.pin-dialog-hint i {
-  font-size: 13px;
-  margin-top: 1px;
+.pin-dialog-hint-card i {
+  font-size: 14px;
   color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pin-dialog-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* Reusable In-App Confirmation Modal */

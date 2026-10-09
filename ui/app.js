@@ -1193,6 +1193,14 @@ function openPinDialog({ hasExistingPin = false, onSaved = null, onCancelled = n
   if (inputNew) inputNew.value = '';
   if (inputConfirm) inputConfirm.value = '';
 
+  // Reset peek states to password
+  [inputCurrent, inputNew, inputConfirm].forEach(inp => {
+    if (inp) inp.type = 'password';
+  });
+  modal.querySelectorAll('.btn-peek i').forEach(icon => {
+    icon.className = 'ri-eye-line';
+  });
+
   if (errorBox) errorBox.classList.add('hidden');
   if (errorText) errorText.textContent = '';
 
@@ -1236,11 +1244,17 @@ function setupPinDialog() {
   if (btnClose) btnClose.addEventListener('click', () => closePinDialog(true));
   if (btnCancel) btnCancel.addEventListener('click', () => closePinDialog(true));
 
-  // Restrict inputs to 4 digits
+  // Restrict inputs to 4 digits & handle Enter to submit
   [inputCurrent, inputNew, inputConfirm].forEach(inp => {
     if (!inp) return;
     inp.addEventListener('input', (e) => {
       e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (btnSave) btnSave.click();
+      }
     });
   });
 

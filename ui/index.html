@@ -517,61 +517,109 @@
       <div class="modal-card pin-dialog-card">
         <div class="modal-header">
           <div class="pin-dialog-title-group">
-            <i class="ri-shield-keyhole-line pin-dialog-icon"></i>
-            <h3 class="modal-title" id="pin-modal-title" data-i18n="pin_dlg_title_change">Đổi mã PIN Ghi chú</h3>
+            <div class="pin-header-icon-badge">
+              <i class="ri-shield-keyhole-line"></i>
+            </div>
+            <div>
+              <h3 class="modal-title" id="pin-modal-title" data-i18n="pin_dlg_title_change">Đổi mã PIN Ghi chú</h3>
+              <p class="modal-subtitle" data-i18n="pin_dlg_subtitle">Bảo vệ an toàn cho các ghi chú của bạn</p>
+            </div>
           </div>
-          <button class="modal-close-btn" id="btn-close-pin-modal">
+          <button class="modal-close-btn" id="btn-close-pin-modal" title="Đóng">
             <i class="ri-close-line"></i>
           </button>
         </div>
 
-        <div class="modal-body" style="gap: 12px; padding: 16px 20px;">
+        <div class="modal-body pin-dialog-body">
           <!-- Inline Error Banner -->
           <div class="pin-modal-error hidden" id="pin-modal-error">
             <i class="ri-error-warning-fill"></i>
             <span id="pin-modal-error-text"></span>
           </div>
 
-          <!-- Field 1: Current PIN (only when changing existing PIN) -->
-          <div class="form-group" id="group-pin-current">
-            <label class="form-label" data-i18n="pin_dlg_current">Mã PIN hiện tại</label>
-            <div class="pin-input-peek-wrapper">
-              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-current" maxlength="4" placeholder="Nhập mã PIN đang sử dụng" autocomplete="off" />
-              <button type="button" class="btn-peek" data-target="pin-input-current" title="Hiện/ẩn mã PIN">
+          <!-- Section 1: Current PIN (only when changing existing PIN) -->
+          <div class="pin-form-group" id="group-pin-current">
+            <label class="pin-field-label">
+              <i class="ri-shield-user-line"></i>
+              <span data-i18n="pin_dlg_current">Mã PIN hiện tại</span>
+            </label>
+            <div class="pin-input-control">
+              <div class="pin-input-prefix">
+                <i class="ri-key-2-line"></i>
+              </div>
+              <input type="password" 
+                     class="pin-field-input" 
+                     id="pin-input-current" 
+                     maxlength="4" 
+                     inputmode="numeric" 
+                     pattern="[0-9]*"
+                     placeholder="Nhập mã PIN đang sử dụng" 
+                     data-i18n-placeholder="pin_dlg_current_placeholder"
+                     autocomplete="off" />
+              <button type="button" class="btn-peek pin-peek-btn" data-target="pin-input-current" title="Hiện/ẩn mã PIN">
                 <i class="ri-eye-line"></i>
               </button>
             </div>
           </div>
 
-          <!-- Field 2: New PIN -->
-          <div class="form-group">
-            <label class="form-label" id="label-pin-new" data-i18n="pin_dlg_new">Mã PIN mới (4 chữ số)</label>
-            <div class="pin-input-peek-wrapper">
-              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-new" maxlength="4" placeholder="Nhập 4 chữ số mới" autocomplete="off" />
-              <button type="button" class="btn-peek" data-target="pin-input-new" title="Hiện/ẩn mã PIN">
-                <i class="ri-eye-line"></i>
-              </button>
+          <!-- Section 2: Unified Paired Setup for New PIN & Confirmation -->
+          <div class="pin-form-group">
+            <label class="pin-field-label" id="label-pin-new">
+              <i class="ri-lock-password-line"></i>
+              <span data-i18n="pin_dlg_new">Thiết lập mã PIN mới</span>
+            </label>
+            <div class="pin-unified-panel">
+              <!-- Row 1: New PIN -->
+              <div class="pin-input-row">
+                <div class="pin-input-prefix">
+                  <i class="ri-lock-line"></i>
+                </div>
+                <input type="password" 
+                       class="pin-field-input" 
+                       id="pin-input-new" 
+                       maxlength="4" 
+                       inputmode="numeric" 
+                       pattern="[0-9]*"
+                       placeholder="Nhập 4 chữ số mới" 
+                       data-i18n-placeholder="pin_dlg_new_placeholder"
+                       autocomplete="off" />
+                <button type="button" class="btn-peek pin-peek-btn" data-target="pin-input-new" title="Hiện/ẩn mã PIN">
+                  <i class="ri-eye-line"></i>
+                </button>
+              </div>
+
+              <!-- Sleek Divider -->
+              <div class="pin-row-divider"></div>
+
+              <!-- Row 2: Confirm PIN -->
+              <div class="pin-input-row">
+                <div class="pin-input-prefix">
+                  <i class="ri-shield-check-line"></i>
+                </div>
+                <input type="password" 
+                       class="pin-field-input" 
+                       id="pin-input-confirm" 
+                       maxlength="4" 
+                       inputmode="numeric" 
+                       pattern="[0-9]*"
+                       placeholder="Nhập lại mã PIN mới" 
+                       data-i18n-placeholder="pin_dlg_confirm_placeholder"
+                       autocomplete="off" />
+                <button type="button" class="btn-peek pin-peek-btn" data-target="pin-input-confirm" title="Hiện/ẩn mã PIN">
+                  <i class="ri-eye-line"></i>
+                </button>
+              </div>
             </div>
           </div>
 
-          <!-- Field 3: Confirm New PIN -->
-          <div class="form-group">
-            <label class="form-label" data-i18n="pin_dlg_confirm">Xác nhận mã PIN mới</label>
-            <div class="pin-input-peek-wrapper">
-              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-confirm" maxlength="4" placeholder="Nhập lại mã PIN mới" autocomplete="off" />
-              <button type="button" class="btn-peek" data-target="pin-input-confirm" title="Hiện/ẩn mã PIN">
-                <i class="ri-eye-line"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="pin-dialog-hint">
+          <!-- Security Guidance Hint -->
+          <div class="pin-dialog-hint-card">
             <i class="ri-information-line"></i>
             <span data-i18n="pin_hint">Mã PIN gồm đúng 4 chữ số (0-9) dùng để bảo vệ quyền riêng tư các ghi chú.</span>
           </div>
         </div>
 
-        <div class="modal-footer" style="padding: 12px 20px;">
+        <div class="modal-footer pin-dialog-footer">
           <button class="btn-secondary" id="btn-cancel-pin" data-i18n="btn_cancel">Hủy</button>
           <button class="btn-primary" id="btn-save-pin-modal">
             <i class="ri-check-line"></i>
