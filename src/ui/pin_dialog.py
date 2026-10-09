@@ -20,6 +20,7 @@ class SetPinDialog(Adw.Window):
         has_existing_pin: bool,
         verify_current_cb: Optional[Callable[[str], bool]],
         on_pin_set: Callable[[str], None],
+        on_cancelled: Optional[Callable[[], None]] = None,
         lang: str = "vi",
     ):
         super().__init__()
@@ -29,6 +30,8 @@ class SetPinDialog(Adw.Window):
         self.has_existing_pin = has_existing_pin
         self.verify_current_cb = verify_current_cb
         self.on_pin_set = on_pin_set
+        self.on_cancelled = on_cancelled
+        self._saved = False
 
         title = t("pin_dlg_title_change" if has_existing_pin else "pin_dlg_title_set", self.lang)
         self.set_title(title)
@@ -36,6 +39,7 @@ class SetPinDialog(Adw.Window):
         self.set_resizable(False)
 
         self._build_ui(title)
+        self.connect("close-request", self._on_close_request)
 
     def _build_ui(self, title: str):
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -45,7 +49,7 @@ class SetPinDialog(Adw.Window):
         header.set_title_widget(Adw.WindowTitle(title=title))
 
         cancel_btn = Gtk.Button(label=t("btn_cancel", self.lang))
-        cancel_btn.connect("clicked", lambda _: self.close())
+        cancel_btn.connect("clicked", self._on_cancel_clicked)
         header.pack_start(cancel_btn)
 
         self.save_btn = Gtk.Button(label=t("btn_save", self.lang) if self.lang == "vi" else "Save")
@@ -84,8 +88,9 @@ class SetPinDialog(Adw.Window):
             cur_box.append(lbl)
 
             self.curr_entry = Gtk.PasswordEntry()
-            self.curr_entry.set_placeholder_text("••••")
+            self.curr_entry.set_show_peek_icon(True)
             self._restrict_4_digits(self.curr_entry)
+            self.curr_entry.connect("activate", lambda _: self.new_entry.grab_focus())
             cur_box.append(self.curr_entry)
             body.append(cur_box)
         else:
@@ -99,8 +104,9 @@ class SetPinDialog(Adw.Window):
         new_box.append(lbl_new)
 
         self.new_entry = Gtk.PasswordEntry()
-        self.new_entry.set_placeholder_text("••••")
+        self.new_entry.set_show_peek_icon(True)
         self._restrict_4_digits(self.new_entry)
+        self.new_entry.connect("activate", lambda _: self.conf_entry.grab_focus())
         new_box.append(self.new_entry)
         body.append(new_box)
 
@@ -112,8 +118,9 @@ class SetPinDialog(Adw.Window):
         conf_box.append(lbl_conf)
 
         self.conf_entry = Gtk.PasswordEntry()
-        self.conf_entry.set_placeholder_text("••••")
+        self.conf_entry.set_show_peek_icon(True)
         self._restrict_4_digits(self.conf_entry)
+        self.conf_entry.connect("activate", lambda _: self._on_save_clicked(None))
         conf_box.append(self.conf_entry)
         body.append(conf_box)
 
@@ -136,6 +143,16 @@ class SetPinDialog(Adw.Window):
     def _show_error(self, msg: str):
         self.err_lbl.set_text(msg)
         self.err_lbl.set_visible(True)
+
+    def _on_cancel_clicked(self, _btn):
+        if not self._saved and self.on_cancelled:
+            self.on_cancelled()
+        self.close()
+
+    def _on_close_request(self, _win):
+        if not self._saved and self.on_cancelled:
+            self.on_cancelled()
+        return False
 
     def _on_save_clicked(self, _btn):
         # 1. Verify current PIN if required
@@ -161,5 +178,6 @@ class SetPinDialog(Adw.Window):
             return
 
         # Success!
+        self._saved = True
         self.on_pin_set(new_val)
         self.close()

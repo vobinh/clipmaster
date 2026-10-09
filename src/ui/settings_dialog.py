@@ -445,7 +445,7 @@ class SettingsDialog(Adw.PreferencesWindow):
 
     def _update_notes_sec_group(self):
         """Cập nhật giao diện nhóm bảo mật ghi chú."""
-        self.group_notes_sec.set_title(t("group_notes_sec", self.lang))
+        self.group_notes_sec.set_title(t("group_notes_security", self.lang))
         self.pin_enable_row.set_title(t("row_pin_enable", self.lang))
         self.pin_enable_row.set_subtitle(t("row_pin_enable_sub", self.lang))
 
@@ -501,19 +501,20 @@ class SettingsDialog(Adw.PreferencesWindow):
                     if self.on_settings_changed:
                         self.on_settings_changed()
 
+                def _on_cancel():
+                    if not self.db.is_notes_pin_enabled():
+                        self._updating_pin_switch = True
+                        self.pin_switch.set_active(False)
+                        self._updating_pin_switch = False
+
                 dlg = SetPinDialog(
                     parent_window=self,
                     has_existing_pin=False,
                     verify_current_cb=None,
                     on_pin_set=_on_set,
+                    on_cancelled=_on_cancel,
                     lang=self.lang,
                 )
-                def _on_close_check(_widget):
-                    if not self.db.is_notes_pin_enabled():
-                        self._updating_pin_switch = True
-                        self.pin_switch.set_active(False)
-                        self._updating_pin_switch = False
-                dlg.connect("destroy", _on_close_check)
                 dlg.present()
         else:
             self.db.disable_notes_pin()
