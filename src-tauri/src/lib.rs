@@ -49,6 +49,9 @@ pub fn run() {
             test_sync_connection,
             hide_window,
             close_window,
+            drag_window,
+            toggle_clipboard_pause,
+            is_clipboard_paused,
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

@@ -82,13 +82,30 @@ pub fn detect_content_type(text: &str) -> &'static str {
 
 pub struct ClipboardManager {
     last_hash: Arc<Mutex<String>>,
+    is_paused: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ClipboardManager {
     pub fn new() -> Self {
         Self {
             last_hash: Arc::new(Mutex::new(String::new())),
+            is_paused: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.is_paused.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_paused(&self, paused: bool) {
+        self.is_paused.store(paused, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn toggle_pause(&self) -> bool {
+        let current = self.is_paused.load(std::sync::atomic::Ordering::Relaxed);
+        let next = !current;
+        self.is_paused.store(next, std::sync::atomic::Ordering::Relaxed);
+        next
     }
 
     pub fn set_text(&self, text: &str) -> Result<(), String> {
@@ -109,6 +126,7 @@ impl ClipboardManager {
         app_handle: AppHandle,
     ) {
         let last_hash_clone = Arc::clone(&self.last_hash);
+        let is_paused_clone = Arc::clone(&self.is_paused);
 
         thread::spawn(move || {
             let mut clip_res = Clipboard::new();
@@ -118,6 +136,16 @@ impl ClipboardManager {
 
             loop {
                 thread::sleep(Duration::from_millis(400));
+
+                // If clipboard recording is paused or auto_record is disabled, skip checking
+                if is_paused_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                    continue;
+                }
+
+                let auto_record = db.get_setting("auto_record", "1") != "0";
+                if !auto_record {
+                    continue;
+                }
 
                 let text_res = match &mut clip_res {
                     Ok(clip) => clip.get_text(),

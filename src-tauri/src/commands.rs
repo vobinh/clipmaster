@@ -224,7 +224,15 @@ pub fn test_sync_connection(state: State<AppState>) -> Result<String, String> {
     Ok("Đã lưu cấu hình máy chủ đồng bộ (Sẵn sàng)".to_string())
 }
 
-// ── Window Controls ────────────────────────────────────
+// ── Window Controls & Actions ──────────────────────────
+
+#[tauri::command]
+pub fn drag_window(app_handle: AppHandle) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        window.start_dragging().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
 
 #[tauri::command]
 pub fn hide_window(app_handle: AppHandle) {
@@ -239,3 +247,17 @@ pub fn close_window(app_handle: AppHandle) {
         window.close().ok();
     }
 }
+
+// ── Clipboard Pause / Resume Controls ──────────────────
+
+#[tauri::command]
+pub fn toggle_clipboard_pause(state: State<AppState>) -> Result<bool, String> {
+    let paused = state.clipboard.toggle_pause();
+    Ok(paused)
+}
+
+#[tauri::command]
+pub fn is_clipboard_paused(state: State<AppState>) -> Result<bool, String> {
+    Ok(state.clipboard.is_paused())
+}
+

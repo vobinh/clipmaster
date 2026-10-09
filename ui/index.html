@@ -11,14 +11,17 @@
   <div class="app-container">
     <!-- Header Bar -->
     <header class="header-bar" data-tauri-drag-region>
-      <div class="header-left">
+      <div class="header-left" data-tauri-drag-region>
         <span class="status-indicator active" id="status-indicator" title="Connected"></span>
-        <div class="brand-group">
-          <h1 class="app-title" data-i18n="app_title">ClipMaster</h1>
-          <span class="app-subtitle" id="app-subtitle" data-i18n="app_subtitle">Lịch sử Clipboard (Win + V)</span>
+        <div class="brand-group" data-tauri-drag-region>
+          <h1 class="app-title" data-i18n="app_title" data-tauri-drag-region>ClipMaster</h1>
+          <span class="app-subtitle" id="app-subtitle" data-i18n="app_subtitle" data-tauri-drag-region>Lịch sử Clipboard (Win + V)</span>
         </div>
       </div>
       <div class="header-right">
+        <button class="icon-btn" id="btn-pause" data-i18n-title="tooltip_pause" title="Tạm dừng theo dõi clipboard">
+          <i class="ri-pause-circle-line" id="icon-pause"></i>
+        </button>
         <button class="icon-btn" id="btn-clear" data-i18n-title="tooltip_clear" title="Xóa toàn bộ mục chưa ghim">
           <i class="ri-delete-bin-line"></i>
         </button>

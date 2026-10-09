@@ -139,6 +139,13 @@ async function mockInvoke(cmd, args) {
       return;
     case 'test_sync_connection':
       return "Đã kết nối máy chủ đồng bộ thử nghiệm thành công!";
+    case 'toggle_clipboard_pause':
+      mockStore.is_paused = !mockStore.is_paused;
+      return mockStore.is_paused;
+    case 'is_clipboard_paused':
+      return !!mockStore.is_paused;
+    case 'drag_window':
+      return;
     case 'hide_window':
     case 'close_window':
       console.log(`[Window Action] ${cmd}`);
@@ -259,6 +266,11 @@ function applyLanguage(lang) {
   const elLang = document.getElementById('setting-language');
   if (elLang) elLang.value = currentLang;
 
+  // Sync Pause Button Tooltip
+  if (DOM.btnPause) {
+    DOM.btnPause.title = state.isPaused ? t('tooltip_resume') : t('tooltip_pause');
+  }
+
   // 9. Re-render current items & footer status for localized time badges & tooltips
   if (state.mode === 'history') {
     if (state.currentItems.length > 0) renderHistoryCards(state.currentItems);
@@ -291,7 +303,8 @@ const state = {
   pinFailedAttempts: 0,
   lockoutTimer: null,
   lockoutRemaining: 0,
-  activeNoteColor: ''
+  activeNoteColor: '',
+  isPaused: false
 };
 
 // ── DOM References ─────────────────────────────────────────────────
@@ -313,6 +326,8 @@ const DOM = {
   btnSearchClear: document.getElementById('btn-search-clear'),
 
   // Header actions
+  btnPause: document.getElementById('btn-pause'),
+  iconPause: document.getElementById('icon-pause'),
   btnClear: document.getElementById('btn-clear'),
   btnTheme: document.getElementById('btn-theme'),
   btnSettings: document.getElementById('btn-settings'),
@@ -1282,6 +1297,67 @@ function setupHeaderActions() {
     updateThemeUI(nextTheme);
     await invoke('set_setting', { key: 'theme_mode', value: nextTheme });
   });
+
+  // Pause / Resume Clipboard Monitoring
+  setupPauseButton();
+
+  // Native Window Dragging
+  setupWindowDrag();
+}
+
+function setupPauseButton() {
+  if (DOM.btnPause) {
+    DOM.btnPause.addEventListener('click', async () => {
+      try {
+        const isPaused = await invoke('toggle_clipboard_pause');
+        updatePauseUI(isPaused);
+        showToast(isPaused ? t('toast_clipboard_paused') : t('toast_clipboard_resumed'));
+      } catch (e) {
+        console.error("Toggle pause error:", e);
+      }
+    });
+  }
+}
+
+function updatePauseUI(isPaused) {
+  state.isPaused = isPaused;
+  const iconPause = document.getElementById('icon-pause');
+  const indicator = document.getElementById('status-indicator');
+
+  if (DOM.btnPause && iconPause) {
+    if (isPaused) {
+      iconPause.className = 'ri-play-circle-line';
+      DOM.btnPause.title = t('tooltip_resume');
+      DOM.btnPause.classList.add('paused');
+      if (indicator) {
+        indicator.className = 'status-indicator paused';
+        indicator.title = currentLang === 'en' ? "Clipboard monitoring paused" : "Đã tạm dừng theo dõi clipboard";
+      }
+    } else {
+      iconPause.className = 'ri-pause-circle-line';
+      DOM.btnPause.title = t('tooltip_pause');
+      DOM.btnPause.classList.remove('paused');
+      if (indicator) {
+        indicator.className = 'status-indicator active';
+        indicator.title = currentLang === 'en' ? "Clipboard monitoring active" : "Đang theo dõi bộ nhớ tạm";
+      }
+    }
+  }
+}
+
+function setupWindowDrag() {
+  const header = document.querySelector('.header-bar');
+  if (header) {
+    header.addEventListener('mousedown', (e) => {
+      // Don't drag if clicking buttons, inputs or icons
+      if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('.icon-btn')) {
+        return;
+      }
+      if (e.button === 0) { // Primary left mouse button
+        invoke('drag_window').catch(() => {});
+      }
+    });
+  }
 }
 
 // ── Listen for System Clipboard Events ─────────────────────────────
@@ -1346,6 +1422,14 @@ async function init() {
   } catch (e) {
     console.error("Language load error:", e);
     applyLanguage('vi');
+  }
+
+  // Load initial pause state
+  try {
+    const initialPaused = await invoke('is_clipboard_paused');
+    updatePauseUI(!!initialPaused);
+  } catch (e) {
+    console.warn("Could not check pause status:", e);
   }
 
   // Initial load

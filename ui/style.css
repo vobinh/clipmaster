@@ -96,6 +96,15 @@ body {
   cursor: grab;
   height: 48px;
   flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.header-bar:active {
+  cursor: grabbing;
+}
+
+.header-left, .brand-group, .app-title, .app-subtitle {
+  -webkit-app-region: drag;
 }
 
 .header-left {
@@ -116,6 +125,11 @@ body {
 .status-indicator.active {
   background: var(--success);
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.status-indicator.paused {
+  background: var(--warning);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
 }
 
 .brand-group {
@@ -143,6 +157,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  -webkit-app-region: no-drag;
 }
 
 .icon-btn {
@@ -158,11 +173,21 @@ body {
   justify-content: center;
   font-size: 16px;
   transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
 }
 
 .icon-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.icon-btn.paused {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.icon-btn.paused:hover {
+  background: rgba(245, 158, 11, 0.2);
 }
 
 .close-btn:hover {
