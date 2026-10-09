@@ -23,11 +23,19 @@ from ..shortcut_manager import (
 )
 from ..i18n import t, AVAILABLE_LANGUAGES
 from ..theme_manager import apply_theme_mode, THEME_MODES
+from ..sync_manager import SyncManager
 from .shortcut_dialog import ShortcutRecordDialog
+from .sync_setup_dialog import SyncSetupDialog
 
 
 class SettingsDialog(Adw.PreferencesWindow):
-    def __init__(self, parent_window: Gtk.Window, db: Database, on_settings_changed: Callable):
+    def __init__(
+        self,
+        parent_window: Gtk.Window,
+        db: Database,
+        on_settings_changed: Callable,
+        sync_mgr: SyncManager = None,
+    ):
         super().__init__()
         self.set_transient_for(parent_window)
         self.set_modal(True)
@@ -35,6 +43,7 @@ class SettingsDialog(Adw.PreferencesWindow):
 
         self.db = db
         self.on_settings_changed = on_settings_changed
+        self.sync_mgr = sync_mgr
         self.lang = self.db.get_setting("language", "vi")
         self._updating_combo = False
         self._updating_lang = False
@@ -154,7 +163,45 @@ class SettingsDialog(Adw.PreferencesWindow):
 
         self.page.add(self.group_storage)
 
-        # --- Group 4: Vùng nguy hiểm ---
+        # --- Group 4: Đồng bộ đám mây (BYOS Sync) ---
+        self.group_sync = Adw.PreferencesGroup()
+
+        # Trạng thái kết nối
+        self.sync_status_row = Adw.ActionRow()
+        self.sync_status_lbl = Gtk.Label()
+        self.sync_status_lbl.set_valign(Gtk.Align.CENTER)
+        self.sync_status_row.add_suffix(self.sync_status_lbl)
+        self.group_sync.add(self.sync_status_row)
+
+        # URL đang kết nối
+        self.sync_url_row = Adw.ActionRow()
+        self.group_sync.add(self.sync_url_row)
+
+        # Nút hành động
+        sync_btn_row = Adw.ActionRow()
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_box.set_valign(Gtk.Align.CENTER)
+
+        self.sync_setup_btn = Gtk.Button()
+        self.sync_setup_btn.add_css_class("suggested-action")
+        self.sync_setup_btn.connect("clicked", self._on_sync_setup)
+        btn_box.append(self.sync_setup_btn)
+
+        self.sync_now_btn = Gtk.Button()
+        self.sync_now_btn.connect("clicked", self._on_sync_now)
+        btn_box.append(self.sync_now_btn)
+
+        self.sync_disconnect_btn = Gtk.Button()
+        self.sync_disconnect_btn.add_css_class("destructive-action")
+        self.sync_disconnect_btn.connect("clicked", self._on_sync_disconnect)
+        btn_box.append(self.sync_disconnect_btn)
+
+        sync_btn_row.add_suffix(btn_box)
+        self.group_sync.add(sync_btn_row)
+
+        self.page.add(self.group_sync)
+
+        # --- Group 5: Vùng nguy hiểm ---
         self.group_danger = Adw.PreferencesGroup()
 
         self.clear_all_row = Adw.ActionRow()
@@ -233,6 +280,9 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.clear_all_row.set_title(t("row_clear_all", self.lang))
         self.clear_all_row.set_subtitle(t("row_clear_all_sub", self.lang))
         self.clear_btn.set_label(t("btn_clear_now", self.lang))
+
+        # Sync Group
+        self._update_sync_group()
 
     def _on_theme_changed(self, combo, gparam):
         if self._updating_theme:
@@ -337,3 +387,87 @@ class SettingsDialog(Adw.PreferencesWindow):
     def _on_clear_unpinned(self, btn):
         self.db.clear_unpinned()
         self.on_settings_changed()
+
+    # ─── Sync Group ──────────────────────────────
+
+    def _update_sync_group(self):
+        """Cập nhật UI của group sync dựa trên trạng thái kết nối."""
+        self.group_sync.set_title(t("group_sync", self.lang))
+        self.group_sync.set_description(t("group_sync_desc", self.lang))
+        self.sync_status_row.set_title(t("row_sync_status", self.lang))
+
+        is_connected = self.sync_mgr is not None and self.sync_mgr.is_configured()
+
+        if is_connected:
+            url = self.sync_mgr.get_configured_url() or ""
+            self.sync_status_lbl.set_markup(
+                f'<span foreground="#4CAF50">{t("row_sync_status_connected", self.lang)}</span>'
+            )
+            self.sync_url_row.set_title(t("row_sync_url", self.lang))
+            self.sync_url_row.set_subtitle(url)
+            self.sync_url_row.set_visible(True)
+            self.sync_now_btn.set_visible(True)
+            self.sync_disconnect_btn.set_visible(True)
+            self.sync_setup_btn.set_label(t("btn_sync_setup", self.lang))
+        else:
+            self.sync_status_lbl.set_markup(
+                f'<span foreground="#9E9E9E">{t("row_sync_status_disconnected", self.lang)}</span>'
+            )
+            self.sync_url_row.set_visible(False)
+            self.sync_now_btn.set_visible(False)
+            self.sync_disconnect_btn.set_visible(False)
+            self.sync_setup_btn.set_label(t("btn_sync_setup", self.lang))
+
+        self.sync_setup_btn.set_label(t("btn_sync_setup", self.lang))
+        self.sync_now_btn.set_label(t("btn_sync_now", self.lang))
+        self.sync_disconnect_btn.set_label(t("btn_sync_disconnect", self.lang))
+
+    def _on_sync_setup(self, _btn):
+        """Mở dialog cấu hình BYOS Sync."""
+        if not self.sync_mgr:
+            return
+        dialog = SyncSetupDialog(
+            parent_window=self,
+            sync_mgr=self.sync_mgr,
+            lang=self.lang,
+            on_connected=self._on_sync_connected,
+        )
+        dialog.present()
+
+    def _on_sync_connected(self):
+        """Callback sau khi cấu hình sync thành công."""
+        self._update_sync_group()
+        # Toast thông báo
+        toast = Adw.Toast(title=t("toast_sync_done", self.lang))
+        toast.set_timeout(2)
+        self.add_toast(toast)
+
+    def _on_sync_now(self, _btn):
+        """Kích hoạt đồng bộ thủ công ngay lập tức."""
+        if not self.sync_mgr:
+            return
+        self.sync_now_btn.set_sensitive(False)
+
+        def _done():
+            from gi.repository import GLib
+            def _ui():
+                self.sync_now_btn.set_sensitive(True)
+                toast = Adw.Toast(title=t("toast_sync_done", self.lang))
+                toast.set_timeout(2)
+                self.add_toast(toast)
+                self.on_settings_changed()
+            GLib.idle_add(_ui)
+
+        self.sync_mgr.run_startup_sync_async(on_done=_done)
+
+    def _on_sync_disconnect(self, _btn):
+        """Ngắt kết nối và xóa config."""
+        if not self.sync_mgr:
+            return
+        self.sync_mgr.config.clear()
+        self.sync_mgr._reset_client()
+        self._update_sync_group()
+        toast = Adw.Toast(title=t("toast_sync_disconnected", self.lang))
+        toast.set_timeout(2)
+        self.add_toast(toast)
+

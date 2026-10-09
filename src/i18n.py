@@ -105,6 +105,19 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "row_max_items": "Số lượng mục lưu trữ tối đa",
         "row_max_items_sub": "Các mục chưa ghim cũ nhất sẽ tự động được dọn dẹp",
 
+        # Settings: Sync (BYOS)
+        "group_sync": "☁️ Đồng bộ đám mây (BYOS)",
+        "group_sync_desc": "Đồng bộ các mục đã ghim giữa nhiều máy qua Supabase project của riêng bạn",
+        "row_sync_status": "Trạng thái kết nối",
+        "row_sync_status_connected": "● Đã kết nối",
+        "row_sync_status_disconnected": "○ Chưa kết nối",
+        "row_sync_url": "Supabase URL",
+        "btn_sync_setup": "Cấu hình đồng bộ...",
+        "btn_sync_now": "🔄 Đồng bộ ngay",
+        "btn_sync_disconnect": "Ngắt kết nối",
+        "toast_sync_done": "☁️ Đồng bộ hoàn tất",
+        "toast_sync_disconnected": "Đã ngắt kết nối đồng bộ",
+
         # Settings: Danger
         "group_danger": "Dọn dẹp",
         "row_clear_all": "Xóa toàn bộ lịch sử",
@@ -228,6 +241,19 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "group_storage": "History Storage",
         "row_max_items": "Maximum items stored",
         "row_max_items_sub": "Oldest unpinned items will be automatically pruned",
+
+        # Settings: Sync (BYOS)
+        "group_sync": "☁️ Cloud Sync (BYOS)",
+        "group_sync_desc": "Sync pinned items across devices using your own Supabase project",
+        "row_sync_status": "Connection Status",
+        "row_sync_status_connected": "● Connected",
+        "row_sync_status_disconnected": "○ Not connected",
+        "row_sync_url": "Supabase URL",
+        "btn_sync_setup": "Configure sync...",
+        "btn_sync_now": "🔄 Sync now",
+        "btn_sync_disconnect": "Disconnect",
+        "toast_sync_done": "☁️ Sync complete",
+        "toast_sync_disconnected": "Cloud sync disconnected",
 
         # Settings: Danger
         "group_danger": "Cleanup",

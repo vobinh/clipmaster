@@ -270,3 +270,94 @@ class Database:
                 (key, value, value)
             )
             conn.commit()
+
+    # ─────────────────────────────────────────────
+    # Sync helpers (dùng bởi SyncManager — BYOS)
+    # ─────────────────────────────────────────────
+
+    def get_pinned_for_sync(self) -> List[Dict[str, Any]]:
+        """Trả về tất cả các mục đang được ghim để đẩy lên cloud."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT content_hash, type, content, char_count, line_count, "
+                "created_at, updated_at FROM clips WHERE is_pinned = 1"
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+    def pin_or_add_by_hash(self, remote_item: Dict[str, Any]) -> None:
+        """
+        Nhận một mục từ cloud và đảm bảo nó tồn tại và được ghim ở local.
+        Nếu mục đã có (theo content_hash) → cập nhật is_pinned = 1.
+        Nếu chưa có → thêm mới với is_pinned = 1.
+        Chỉ áp dụng cho text/code/url/color (không sync image).
+        """
+        content_hash = remote_item.get("content_hash")
+        clip_type = remote_item.get("type", "text")
+        content = remote_item.get("content")
+
+        # Bỏ qua image — không sync file nhị phân
+        if clip_type == "image" or not content_hash:
+            return
+
+        now = time.time()
+
+        # Parse ISO timestamp từ cloud về Unix float
+        def _parse_ts(iso_str) -> float:
+            if not iso_str:
+                return now
+            try:
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+                return dt.timestamp()
+            except Exception:
+                return now
+
+        created_at = _parse_ts(remote_item.get("created_at"))
+        updated_at = _parse_ts(remote_item.get("updated_at"))
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, is_pinned FROM clips WHERE content_hash = ?",
+                (content_hash,)
+            )
+            existing = cur.fetchone()
+
+            if existing:
+                # Chỉ cập nhật is_pinned nếu chưa ghim
+                if existing["is_pinned"] == 0:
+                    cur.execute(
+                        "UPDATE clips SET is_pinned = 1, updated_at = ? WHERE id = ?",
+                        (updated_at, existing["id"])
+                    )
+            else:
+                # Thêm mục mới từ cloud
+                char_count = remote_item.get("char_count", len(content) if content else 0)
+                line_count = remote_item.get("line_count",
+                                             len(content.splitlines()) if content else 0)
+                cur.execute(
+                    """INSERT OR IGNORE INTO clips
+                       (type, content, content_hash, image_path,
+                        image_width, image_height, char_count, line_count,
+                        is_pinned, created_at, updated_at)
+                       VALUES (?, ?, ?, NULL, 0, 0, ?, ?, 1, ?, ?)""",
+                    (clip_type, content, content_hash,
+                     char_count, line_count, created_at, updated_at)
+                )
+            conn.commit()
+
+    def unpin_by_hash(self, content_hash: str) -> None:
+        """
+        Bỏ ghim một mục theo content_hash.
+        Dùng khi cloud báo mục này đã bị unpin từ máy khác.
+        """
+        if not content_hash:
+            return
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE clips SET is_pinned = 0 WHERE content_hash = ?",
+                (content_hash,)
+            )
+            conn.commit()

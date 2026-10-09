@@ -16,16 +16,24 @@ from ..database import Database
 from ..clipboard_manager import ClipboardManager
 from ..i18n import t
 from ..theme_manager import apply_theme_mode, toggle_theme_mode
+from ..sync_manager import SyncManager
 from .history_item_row import HistoryItemRow
 from .settings_dialog import SettingsDialog
 
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, app: Adw.Application, db: Database, clipboard_mgr: ClipboardManager):
+    def __init__(
+        self,
+        app: Adw.Application,
+        db: Database,
+        clipboard_mgr: ClipboardManager,
+        sync_mgr: SyncManager = None,
+    ):
         super().__init__(application=app)
         self.app = app
         self.db = db
         self.clipboard_mgr = clipboard_mgr
+        self.sync_mgr = sync_mgr
 
         self.lang = self.db.get_setting("language", "vi")
         self.current_filter = "all"
@@ -400,10 +408,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.hide()
 
     def _toggle_pin(self, clip_id: int):
+        # Lấy content_hash trước khi toggle (cần để push unpin)
+        clip = self.db.get_clip_by_id(clip_id)
         is_pinned = self.db.toggle_pin(clip_id)
         msg = t("toast_pinned", self.lang) if is_pinned else t("toast_unpinned", self.lang)
         self.show_toast(msg)
         self.reload_history()
+
+        # Sync lên cloud nếu đã cấu hình
+        if self.sync_mgr and clip:
+            content_hash = clip.get("content_hash", "")
+            if is_pinned:
+                self.sync_mgr.push_pin(clip)
+            else:
+                self.sync_mgr.push_unpin(content_hash)
 
     def _delete_clip(self, clip_id: int):
         self.db.delete_clip(clip_id)
@@ -416,7 +434,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.reload_history()
 
     def _open_settings(self, btn):
-        dialog = SettingsDialog(self, self.db, on_settings_changed=self.reload_history)
+        dialog = SettingsDialog(
+            self,
+            self.db,
+            on_settings_changed=self.reload_history,
+            sync_mgr=self.sync_mgr,
+        )
         dialog.present()
 
     def show_toast(self, message: str):

@@ -20,6 +20,7 @@ from src.database import Database
 from src.clipboard_manager import ClipboardManager
 from src.ui.main_window import MainWindow
 from src.theme_manager import apply_theme_mode, toggle_theme_mode
+from src.sync_manager import SyncManager
 from src.shortcut_manager import (
     install_super_v_shortcut,
     remove_super_v_shortcut,
@@ -104,6 +105,7 @@ class ClipMasterApplication(Adw.Application):
         )
         self.db = Database()
         self.clipboard_mgr = None
+        self.sync_mgr = None
         self.window = None
         self._is_held = False
         self.ipc_server = None
@@ -126,6 +128,11 @@ class ClipMasterApplication(Adw.Application):
             on_new_clip=self._on_new_clip
         )
         self.clipboard_mgr.start_monitoring()
+
+        # Khởi tạo SyncManager và chạy startup sync trong nền
+        self.sync_mgr = SyncManager(db=self.db)
+        if self.sync_mgr.is_configured():
+            self.sync_mgr.run_startup_sync_async()
 
         # Start IPC socket server for single-instance commands
         self.ipc_server = start_ipc_server(self._handle_ipc_command)
@@ -242,7 +249,8 @@ class ClipMasterApplication(Adw.Application):
             self.window = MainWindow(
                 app=self,
                 db=self.db,
-                clipboard_mgr=self.clipboard_mgr
+                clipboard_mgr=self.clipboard_mgr,
+                sync_mgr=self.sync_mgr,
             )
 
     def _on_new_clip(self, clip):
