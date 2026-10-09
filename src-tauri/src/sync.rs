@@ -150,7 +150,7 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
 
     let status = resp.status();
     if status.as_u16() == 404 {
-        return Err("Chưa tạo bảng trên Supabase! Bảng 'pinned_clips' không tồn tại.".to_string());
+        return Err("TABLE_NOT_FOUND: Chưa tạo bảng trên Supabase! Bảng 'pinned_clips' không tồn tại.".to_string());
     }
     if status.as_u16() == 401 || status.as_u16() == 403 {
         return Err("API Key (anon public key) không hợp lệ hoặc bị từ chối!".to_string());
@@ -172,7 +172,7 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         .map_err(|e| format!("Không thể kết nối đến user_notes: {}", e))?;
 
     if resp_notes.status().as_u16() == 404 {
-        return Err("Bảng 'user_notes' chưa được tạo trên Supabase!".to_string());
+        return Err("TABLE_NOT_FOUND: Bảng 'user_notes' chưa được tạo trên Supabase!".to_string());
     }
 
     // 3. Probe write test
@@ -204,7 +204,7 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         if !p_res.status().is_success() {
             let p_body = p_res.text().await.unwrap_or_default();
             if p_body.to_lowercase().contains("policy") || p_body.to_lowercase().contains("row-level security") {
-                return Err("Bảng có sẵn nhưng RLS (Row Level Security) đang chặn quyền ghi!".to_string());
+                return Err("RLS_BLOCKED: Bảng có sẵn nhưng RLS (Row Level Security) đang chặn quyền ghi!".to_string());
             }
         } else {
             // Clean up probe record

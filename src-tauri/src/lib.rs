@@ -58,6 +58,7 @@ pub fn run() {
             drag_window,
             toggle_clipboard_pause,
             is_clipboard_paused,
+            open_url,
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

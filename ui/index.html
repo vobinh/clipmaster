@@ -417,6 +417,24 @@
         <!-- Tab 5: Đồng bộ (Cloud Sync) -->
         <div class="settings-content-body hidden" id="tab-pane-sync">
           <div class="settings-section-title" data-i18n="sec_sync">Đồng bộ đám mây (BYOS)</div>
+
+          <!-- Quick 2-Step Setup Banner -->
+          <div class="sync-banner-card">
+            <div class="sync-banner-icon">
+              <i class="ri-sparkling-fill"></i>
+            </div>
+            <div class="sync-banner-content">
+              <h4 class="sync-banner-title" data-i18n="sync_banner_title">Thiết lập đồng bộ nhanh qua 2 bước</h4>
+              <p class="sync-banner-desc" data-i18n="sync_banner_desc">
+                Hướng dẫn từng bước kết nối tài khoản Supabase cá nhân (BYOS) và tự động tạo cơ sở dữ liệu.
+              </p>
+            </div>
+            <button class="btn-primary" id="btn-open-sync-wizard">
+              <i class="ri-magic-line"></i>
+              <span data-i18n="btn_start_wizard">Bắt đầu thiết lập</span>
+            </button>
+          </div>
+
           <div class="settings-row">
             <div class="settings-row-info">
               <span class="settings-row-title" data-i18n="row_sync_enable">Bật đồng bộ đám mây</span>
@@ -646,6 +664,170 @@
         </div>
       </div>
     </div>
+
+    <!-- 2-Step Sync Setup Wizard Modal (BYOS) -->
+    <div class="modal-overlay hidden" id="modal-sync-wizard" style="z-index: 150;">
+      <div class="modal-card sync-wizard-card">
+        <!-- Wizard Header -->
+        <div class="modal-header sync-wizard-header">
+          <div class="sync-wizard-title-group">
+            <div class="sync-wizard-badge-icon">
+              <i class="ri-cloud-line"></i>
+            </div>
+            <div>
+              <h3 class="modal-title" data-i18n="sync_wizard_title">Cấu hình đồng bộ đám mây (BYOS)</h3>
+              <p class="modal-subtitle" data-i18n="sync_wizard_subtitle">Thiết lập kết nối an toàn với cơ sở dữ liệu Supabase của bạn</p>
+            </div>
+          </div>
+          <button class="btn-icon" id="btn-close-sync-wizard" title="Đóng">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+
+        <!-- Stepper indicator -->
+        <div class="sync-wizard-stepper">
+          <div class="wizard-step-item active" id="wizard-step-ind-1">
+            <div class="wizard-step-circle">1</div>
+            <div class="wizard-step-label" data-i18n="wizard_step_1_nav">Thông tin dự án</div>
+          </div>
+          <div class="wizard-step-line" id="wizard-line-1"></div>
+          <div class="wizard-step-item" id="wizard-step-ind-2">
+            <div class="wizard-step-circle">2</div>
+            <div class="wizard-step-label" data-i18n="wizard_step_2_nav">Khởi tạo Database</div>
+          </div>
+          <div class="wizard-step-line" id="wizard-line-2"></div>
+          <div class="wizard-step-item" id="wizard-step-ind-3">
+            <div class="wizard-step-circle"><i class="ri-check-line"></i></div>
+            <div class="wizard-step-label" data-i18n="wizard_step_3_nav">Hoàn tất</div>
+          </div>
+        </div>
+
+        <!-- Wizard Pages Container -->
+        <div class="sync-wizard-body">
+          <!-- STEP 1: Enter URL + Anon Key -->
+          <div class="wizard-page active" id="wizard-page-1">
+            <div class="wizard-guide-box">
+              <div class="wizard-guide-header">
+                <i class="ri-information-line"></i>
+                <strong data-i18n="wizard_step_1_title">Bước 1 / 2 — Thông tin dự án</strong>
+              </div>
+              <p class="wizard-guide-text" data-i18n="wizard_step_1_desc">Nhập thông tin kết nối từ Supabase project của bạn.</p>
+              <div class="wizard-guide-sub" data-i18n="wizard_step_1_sub">Lấy tại: Supabase Dashboard → Project Settings → API</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label class="form-label">
+                <span data-i18n="wizard_url_label">Project URL</span>
+                <span class="wizard-field-required">*</span>
+              </label>
+              <input type="text" class="form-input" id="wizard-input-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off" />
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label">
+                <span data-i18n="wizard_key_label">Anon Public Key (API Key)</span>
+                <span class="wizard-field-required">*</span>
+              </label>
+              <div class="pin-input-peek-wrapper">
+                <input type="password" class="form-input" id="wizard-input-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." autocomplete="off" />
+                <button type="button" class="btn-peek" data-target="wizard-input-key" title="Hiện/ẩn API Key">
+                  <i class="ri-eye-line"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="wizard-status-msg" id="wizard-step1-status"></div>
+
+            <div class="wizard-actions-row">
+              <button class="btn-secondary" id="btn-wizard-open-dashboard">
+                <i class="ri-external-link-line"></i>
+                <span data-i18n="wizard_btn_open_dashboard">🌐 Mở Dashboard</span>
+              </button>
+              <button class="btn-primary" id="btn-wizard-step1-next">
+                <span id="wizard-step1-btn-text" data-i18n="wizard_btn_test_next">Kiểm tra kết nối →</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: Database Setup via PAT (Personal Access Token) -->
+          <div class="wizard-page hidden" id="wizard-page-2">
+            <div class="wizard-guide-box warning-theme">
+              <div class="wizard-guide-header">
+                <i class="ri-database-2-line"></i>
+                <strong data-i18n="wizard_step_2_title">Bước 2 / 2 — Khởi tạo Database</strong>
+              </div>
+              <p class="wizard-guide-text" data-i18n="wizard_step_2_desc">Cần tạo bảng dữ liệu trên Supabase project của bạn.</p>
+              <div class="wizard-guide-sub" data-i18n="wizard_step_2_sub">Nhập Personal Access Token (PAT) để ứng dụng tự động thực hiện.</div>
+              <div class="wizard-guide-warning" data-i18n="wizard_step_2_warning">⚠️ PAT chỉ dùng 1 lần để cấu hình và tuyệt đối không được lưu lại.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label class="form-label">
+                <span data-i18n="wizard_pat_label">Personal Access Token (PAT)</span>
+                <span class="wizard-field-required">*</span>
+              </label>
+              <div class="pin-input-peek-wrapper">
+                <input type="password" class="form-input" id="wizard-input-pat" placeholder="sbp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+                <button type="button" class="btn-peek" data-target="wizard-input-pat" title="Hiện/ẩn PAT">
+                  <i class="ri-eye-line"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="wizard-status-msg" id="wizard-step2-status"></div>
+
+            <div class="wizard-actions-row">
+              <button class="btn-secondary" id="btn-wizard-step2-back">
+                <i class="ri-arrow-left-line"></i>
+                <span data-i18n="wizard_btn_back">← Quay lại</span>
+              </button>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-secondary" id="btn-wizard-open-pat-guide">
+                  <i class="ri-book-open-line"></i>
+                  <span data-i18n="wizard_btn_pat_guide">📖 Hướng dẫn lấy PAT</span>
+                </button>
+                <button class="btn-primary" id="btn-wizard-step2-setup">
+                  <i class="ri-magic-line"></i>
+                  <span id="wizard-step2-btn-text" data-i18n="wizard_btn_auto_setup">✨ Tự động thiết lập</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3: Done Page -->
+          <div class="wizard-page hidden" id="wizard-page-3">
+            <div class="wizard-done-container">
+              <div class="wizard-done-icon">
+                <i class="ri-checkbox-circle-fill"></i>
+              </div>
+              <h4 class="wizard-done-title" data-i18n="wizard_done_title">Đồng bộ đã được kích hoạt!</h4>
+              <p class="wizard-done-desc" data-i18n="wizard_done_desc">
+                Các mục ghim và ghi chú sẽ tự động đồng bộ liên tục giữa các máy của bạn.
+              </p>
+
+              <div class="wizard-done-info-card">
+                <div class="done-info-row">
+                  <span class="done-info-label" data-i18n="wizard_done_url_label">Máy chủ Supabase:</span>
+                  <span class="done-info-val" id="wizard-done-project-url">-</span>
+                </div>
+                <div class="done-info-row">
+                  <span class="done-info-label" data-i18n="wizard_done_status_label">Trạng thái:</span>
+                  <span class="done-info-val badge-success" data-i18n="wizard_done_connected">Đã kết nối & Sẵn sàng</span>
+                </div>
+              </div>
+
+              <div style="margin-top: 24px; text-align: center;">
+                <button class="btn-primary" id="btn-wizard-finish" style="padding: 10px 36px; font-size: 13px;">
+                  <i class="ri-check-line"></i>
+                  <span data-i18n="wizard_btn_done">Hoàn tất</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Reusable Confirmation Dialog Modal -->
     <div class="modal-overlay hidden" id="modal-confirm" style="z-index: 200;">

@@ -1639,6 +1639,249 @@ function setupSettingsModal() {
   });
 }
 
+// ── BYOS Sync Setup Wizard ─────────────────────────────────────────
+function setupSyncWizard() {
+  const wizardModal = document.getElementById('modal-sync-wizard');
+  if (!wizardModal) return;
+
+  const btnOpenWizard = document.getElementById('btn-open-sync-wizard');
+  const btnCloseWizard = document.getElementById('btn-close-sync-wizard');
+
+  const stepInd1 = document.getElementById('wizard-step-ind-1');
+  const stepInd2 = document.getElementById('wizard-step-ind-2');
+  const stepInd3 = document.getElementById('wizard-step-ind-3');
+  const stepLine1 = document.getElementById('wizard-line-1');
+  const stepLine2 = document.getElementById('wizard-line-2');
+
+  const page1 = document.getElementById('wizard-page-1');
+  const page2 = document.getElementById('wizard-page-2');
+  const page3 = document.getElementById('wizard-page-3');
+
+  const inputUrl = document.getElementById('wizard-input-url');
+  const inputKey = document.getElementById('wizard-input-key');
+  const inputPat = document.getElementById('wizard-input-pat');
+
+  const step1Status = document.getElementById('wizard-step1-status');
+  const step2Status = document.getElementById('wizard-step2-status');
+
+  const btnOpenDashboard = document.getElementById('btn-wizard-open-dashboard');
+  const btnStep1Next = document.getElementById('btn-wizard-step1-next');
+  const btnStep2Back = document.getElementById('btn-wizard-step2-back');
+  const btnOpenPatGuide = document.getElementById('btn-wizard-open-pat-guide');
+  const btnStep2Setup = document.getElementById('btn-wizard-step2-setup');
+  const btnFinish = document.getElementById('btn-wizard-finish');
+
+  function setStep(stepNum) {
+    if (page1) page1.classList.toggle('hidden', stepNum !== 1);
+    if (page2) page2.classList.toggle('hidden', stepNum !== 2);
+    if (page3) page3.classList.toggle('hidden', stepNum !== 3);
+
+    if (stepInd1) stepInd1.className = 'wizard-step-item' + (stepNum === 1 ? ' active' : (stepNum > 1 ? ' completed' : ''));
+    if (stepInd2) stepInd2.className = 'wizard-step-item' + (stepNum === 2 ? ' active' : (stepNum > 2 ? ' completed' : ''));
+    if (stepInd3) stepInd3.className = 'wizard-step-item' + (stepNum === 3 ? ' active completed' : '');
+
+    if (stepLine1) stepLine1.className = 'wizard-step-line' + (stepNum > 1 ? ' completed' : '');
+    if (stepLine2) stepLine2.className = 'wizard-step-line' + (stepNum > 2 ? ' completed' : '');
+  }
+
+  function setStep1Status(text, type = '') {
+    if (!step1Status) return;
+    step1Status.className = 'wizard-status-msg' + (type ? ' ' + type : '');
+    step1Status.textContent = text;
+  }
+
+  function setStep2Status(text, type = '') {
+    if (!step2Status) return;
+    step2Status.className = 'wizard-status-msg' + (type ? ' ' + type : '');
+    step2Status.textContent = text;
+  }
+
+  function openSyncWizard() {
+    const currentUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
+    const currentToken = document.getElementById('setting-sync-token')?.value.trim() || '';
+    if (inputUrl) inputUrl.value = currentUrl;
+    if (inputKey) inputKey.value = currentToken;
+    if (inputPat) inputPat.value = '';
+
+    setStep1Status('');
+    setStep2Status('');
+    if (btnStep1Next) btnStep1Next.disabled = false;
+    if (btnStep2Setup) btnStep2Setup.disabled = false;
+
+    setStep(1);
+    wizardModal.classList.remove('hidden');
+    setTimeout(() => inputUrl?.focus(), 50);
+  }
+
+  function closeSyncWizard() {
+    wizardModal.classList.add('hidden');
+    if (inputPat) inputPat.value = ''; // Ensure PAT is wiped from memory
+  }
+
+  if (btnOpenWizard) {
+    btnOpenWizard.addEventListener('click', openSyncWizard);
+  }
+
+  if (btnCloseWizard) {
+    btnCloseWizard.addEventListener('click', closeSyncWizard);
+  }
+
+  if (btnOpenDashboard) {
+    btnOpenDashboard.addEventListener('click', async () => {
+      try {
+        await invoke('open_url', { url: 'https://supabase.com/dashboard' });
+      } catch (e) {
+        window.open('https://supabase.com/dashboard', '_blank');
+      }
+    });
+  }
+
+  if (btnOpenPatGuide) {
+    btnOpenPatGuide.addEventListener('click', async () => {
+      try {
+        await invoke('open_url', { url: 'https://supabase.com/dashboard/account/tokens' });
+      } catch (e) {
+        window.open('https://supabase.com/dashboard/account/tokens', '_blank');
+      }
+    });
+  }
+
+  // Step 1: Test connection & check if database exists
+  if (btnStep1Next) {
+    btnStep1Next.addEventListener('click', async () => {
+      const url = inputUrl?.value.trim() || '';
+      const key = inputKey?.value.trim() || '';
+
+      if (!url || !key) {
+        setStep1Status(t('wizard_err_missing_info', '⚠️ Vui lòng nhập đầy đủ URL và Anon API Key.'), 'error');
+        return;
+      }
+
+      setStep1Status(t('wizard_testing', '🔄 Đang kiểm tra kết nối...'), 'loading');
+      btnStep1Next.disabled = true;
+
+      try {
+        await invoke('test_sync_connection', { url, key });
+
+        // Both tables exist and write test passed!
+        setStep1Status(t('wizard_test_ok', '✅ Kết nối thành công!'), 'success');
+
+        await finalizeSyncConnection(url, key);
+
+        setTimeout(() => {
+          showDonePage(url);
+        }, 500);
+
+      } catch (err) {
+        btnStep1Next.disabled = false;
+        const errMsg = err?.toString() || '';
+
+        if (errMsg.includes('TABLE_NOT_FOUND') || errMsg.includes('RLS_BLOCKED')) {
+          if (errMsg.includes('RLS_BLOCKED')) {
+            setStep1Status(t('wizard_rls_blocked', '⚠️ Bảng bị chặn ghi bởi Row Level Security (RLS). Cần cập nhật schema...'), 'error');
+          } else {
+            setStep1Status(t('wizard_need_db', '✅ Kết nối thành công! Cần khởi tạo database...'), 'success');
+          }
+
+          // Auto-advance to Step 2 (Database Setup) after 600ms
+          setTimeout(() => {
+            setStep(2);
+            setTimeout(() => inputPat?.focus(), 60);
+          }, 600);
+        } else {
+          setStep1Status('❌ ' + (errMsg.replace(/^Error:\s*/, '') || 'Lỗi kiểm tra kết nối'), 'error');
+        }
+      }
+    });
+  }
+
+  // Step 2: Back button
+  if (btnStep2Back) {
+    btnStep2Back.addEventListener('click', () => {
+      setStep(1);
+      if (btnStep1Next) btnStep1Next.disabled = false;
+    });
+  }
+
+  // Step 2: Auto setup schema using PAT
+  if (btnStep2Setup) {
+    btnStep2Setup.addEventListener('click', async () => {
+      const url = inputUrl?.value.trim() || '';
+      const key = inputKey?.value.trim() || '';
+      const pat = inputPat?.value.trim() || '';
+
+      if (!pat) {
+        setStep2Status(t('wizard_err_missing_pat', '⚠️ Vui lòng nhập Personal Access Token (PAT).'), 'error');
+        return;
+      }
+
+      setStep2Status(t('wizard_creating_db', '🔄 Đang tạo bảng dữ liệu...'), 'loading');
+      btnStep2Setup.disabled = true;
+
+      try {
+        await invoke('auto_setup_sync_schema', { url, pat });
+
+        setStep2Status(t('wizard_create_ok', '✅ Bảng đã được tạo thành công!'), 'success');
+        if (inputPat) inputPat.value = ''; // Discard PAT immediately
+
+        await finalizeSyncConnection(url, key);
+
+        setTimeout(() => {
+          showDonePage(url);
+        }, 600);
+
+      } catch (err) {
+        btnStep2Setup.disabled = false;
+        const errMsg = err?.toString() || 'Lỗi khởi tạo bảng';
+        setStep2Status('❌ ' + errMsg.replace(/^Error:\s*/, ''), 'error');
+      }
+    });
+  }
+
+  async function finalizeSyncConnection(url, key) {
+    await invoke('set_setting', { key: 'sync_enabled', value: '1' });
+    await invoke('set_setting', { key: 'sync_url', value: url });
+    await invoke('set_setting', { key: 'sync_token', value: key });
+
+    const settingToggle = document.getElementById('setting-sync-toggle');
+    const settingUrl = document.getElementById('setting-sync-url');
+    const settingToken = document.getElementById('setting-sync-token');
+    const syncStatusText = document.getElementById('sync-status-text');
+
+    if (settingToggle) settingToggle.checked = true;
+    if (settingUrl) settingUrl.value = url;
+    if (settingToken) settingToken.value = key;
+    if (syncStatusText) {
+      syncStatusText.textContent = "✅ Đã kết nối Supabase BYOS: " + url;
+    }
+
+    // Trigger background initial sync
+    try {
+      invoke('sync_now').then(async () => {
+        await loadClips();
+        if (state.mode === 'notes') await loadNotes();
+      }).catch(e => console.warn("Background initial sync notice:", e));
+    } catch (e) {
+      console.warn("Background initial sync notice:", e);
+    }
+  }
+
+  function showDonePage(url) {
+    const doneUrlEl = document.getElementById('wizard-done-project-url');
+    if (doneUrlEl) doneUrlEl.textContent = url;
+    setStep(3);
+  }
+
+  if (btnFinish) {
+    btnFinish.addEventListener('click', () => {
+      closeSyncWizard();
+      showToast(t('toast_sync_success', 'Đồng bộ đám mây thành công!'));
+    });
+  }
+
+  window.closeSyncWizard = closeSyncWizard;
+}
+
 // ── Global Keyboard Navigation ─────────────────────────────────────
 function setupKeyboardNavigation() {
   window.addEventListener('keydown', async (e) => {
@@ -1646,6 +1889,7 @@ function setupKeyboardNavigation() {
     const isModalOpen = !DOM.modalNote.classList.contains('hidden') 
       || !DOM.modalSettings.classList.contains('hidden')
       || !document.getElementById('modal-pin')?.classList.contains('hidden')
+      || !document.getElementById('modal-sync-wizard')?.classList.contains('hidden')
       || !document.getElementById('modal-confirm')?.classList.contains('hidden');
 
     if (isModalOpen) {
@@ -1653,6 +1897,7 @@ function setupKeyboardNavigation() {
         closeNoteModal();
         closeSettingsModal();
         closePinDialog(true);
+        if (window.closeSyncWizard) window.closeSyncWizard();
         document.getElementById('modal-confirm')?.classList.add('hidden');
       }
       return;
@@ -1873,6 +2118,7 @@ async function init() {
   setupPinDialog();
   setupNoteModal();
   setupSettingsModal();
+  setupSyncWizard();
   setupKeyboardNavigation();
   setupHeaderActions();
   setupClipboardListener();
