@@ -4,6 +4,10 @@ ClipMaster Sync Manager — BYOS (Bring Your Own Supabase)
 Cho phép người dùng tự cấu hình Supabase project riêng để đồng bộ
 các mục đã ghim (pinned clips) giữa các máy.
 
+Sử dụng trực tiếp REST API (PostgREST & Supabase Management API)
+qua Python standard library (urllib.request), HOÀN TOÀN KHÔNG CẦN
+cài đặt thêm pip package (không cần `supabase` hay `requests`).
+
 Luồng hoạt động:
   1. User nhập Project URL + Anon Key → lưu vào sync_config.json (chmod 600)
   2. Lần đầu: nhập PAT → app tự động tạo bảng qua Management API → PAT không lưu
@@ -14,6 +18,9 @@ Luồng hoạt động:
 import os
 import json
 import threading
+import urllib.request
+import urllib.error
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -105,12 +112,13 @@ class SyncConfig:
 
 
 # ─────────────────────────────────────────────────
-# SyncManager: logic đồng bộ chính
+# SyncManager: logic đồng bộ chính qua PostgREST
 # ─────────────────────────────────────────────────
 
 class SyncManager:
     """
-    Quản lý toàn bộ việc đồng bộ pinned clips với Supabase BYOS.
+    Quản lý toàn bộ việc đồng bộ pinned clips với Supabase BYOS qua PostgREST.
+    Dùng thư viện chuẩn urllib.request — không cần cài đặt pip package.
     Thread-safe: các thao tác mạng đều chạy trong daemon thread.
     """
 
@@ -121,8 +129,7 @@ class SyncManager:
         """
         self.db = db
         self.config = SyncConfig()
-        self._client = None
-        self._client_lock = threading.Lock()
+        self._lock = threading.Lock()
 
     # ── Trạng thái ──────────────────────────────
 
@@ -135,32 +142,48 @@ class SyncManager:
         creds = self.config.load()
         return creds[0] if creds else None
 
-    # ── Supabase client ──────────────────────────
-
-    def _get_client(self):
-        """Lấy Supabase client, khởi tạo nếu chưa có. Thread-safe."""
-        with self._client_lock:
-            if self._client:
-                return self._client
-            creds = self.config.load()
-            if not creds:
-                return None
-            try:
-                from supabase import create_client
-                url, key = creds
-                self._client = create_client(url, key)
-                return self._client
-            except ImportError:
-                print("[Sync] Thiếu thư viện supabase: pip install supabase")
-                return None
-            except Exception as e:
-                print(f"[Sync] Lỗi khởi tạo client: {e}")
-                return None
-
     def _reset_client(self) -> None:
-        """Đặt lại client (dùng sau khi thay đổi config)."""
-        with self._client_lock:
-            self._client = None
+        """Giữ tương thích API (không cần client object với urllib)."""
+        pass
+
+    # ── REST Helper ─────────────────────────────
+
+    def _rest_request(
+        self,
+        method: str,
+        path: str,
+        data: Optional[dict | list] = None,
+        extra_headers: Optional[dict] = None,
+        creds: Optional[tuple[str, str]] = None,
+        timeout: float = 15.0,
+    ):
+        """Thực hiện HTTP request tới Supabase PostgREST endpoint."""
+        if not creds:
+            creds = self.config.load()
+        if not creds:
+            raise ValueError("Chưa cấu hình Supabase credentials")
+
+        base_url, api_key = creds
+        url = f"{base_url.rstrip('/')}/rest/v1{path}"
+
+        headers = {
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "ClipMaster/1.0",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
+
+        body_bytes = json.dumps(data).encode("utf-8") if data is not None else None
+        req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method)
+
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            res_data = response.read().decode("utf-8")
+            if res_data:
+                return json.loads(res_data)
+            return None
 
     # ── Setup: tự động tạo schema qua Management API ──
 
@@ -176,48 +199,50 @@ class SyncManager:
         Returns:
             (success: bool, message: str)
         """
-        import requests as _requests
-
         project_ref = extract_project_ref(url)
         if not project_ref:
             return False, "URL không hợp lệ. Ví dụ: https://xxxx.supabase.co"
 
-        try:
-            resp = _requests.post(
-                f"https://api.supabase.com/v1/projects/{project_ref}/database/query",
-                headers={
-                    "Authorization": f"Bearer {pat.strip()}",
-                    "Content-Type": "application/json",
-                },
-                json={"query": SCHEMA_SQL},
-                timeout=20,
-            )
+        api_url = f"https://api.supabase.com/v1/projects/{project_ref}/database/query"
+        headers = {
+            "Authorization": f"Bearer {pat.strip()}",
+            "Content-Type": "application/json",
+            "User-Agent": "ClipMaster/1.0",
+        }
+        body = json.dumps({"query": SCHEMA_SQL}).encode("utf-8")
+        req = urllib.request.Request(api_url, data=body, headers=headers, method="POST")
 
-            if resp.status_code == 200:
-                return True, "Đã tạo bảng thành công"
-            elif resp.status_code == 401:
+        try:
+            with urllib.request.urlopen(req, timeout=20) as response:
+                if response.status in (200, 201):
+                    return True, "Đã tạo bảng thành công"
+                return True, "Đã khởi tạo database"
+
+        except urllib.error.HTTPError as e:
+            status_code = e.code
+            try:
+                err_body = e.read().decode("utf-8", errors="ignore")
+                detail = json.loads(err_body).get("message", err_body[:200])
+            except Exception:
+                detail = str(e)
+
+            if status_code == 401:
                 return False, "PAT không hợp lệ hoặc đã hết hạn"
-            elif resp.status_code == 403:
+            elif status_code == 403:
                 return False, "PAT không có quyền truy cập project này"
-            elif resp.status_code == 404:
+            elif status_code == 404:
                 return False, "Không tìm thấy project. Kiểm tra lại URL"
             else:
-                try:
-                    detail = resp.json().get("message", resp.text[:200])
-                except Exception:
-                    detail = resp.text[:200]
-                return False, f"Lỗi server ({resp.status_code}): {detail}"
+                return False, f"Lỗi server ({status_code}): {detail}"
 
-        except _requests.Timeout:
-            return False, "Kết nối timeout. Thử lại sau"
-        except _requests.ConnectionError:
-            return False, "Không có kết nối internet"
+        except urllib.error.URLError as e:
+            return False, f"Không kết nối được: {e.reason}"
         except Exception as e:
             return False, f"Lỗi: {e}"
 
     def test_connection(self, url: str, key: str) -> tuple[bool, str]:
         """
-        Kiểm tra URL + anon key có hợp lệ không.
+        Kiểm tra URL + anon key có hợp lệ không qua PostgREST.
 
         Returns:
             (True, "OK") nếu kết nối thành công và bảng tồn tại
@@ -225,20 +250,34 @@ class SyncManager:
             (False, <lỗi>) nếu kết nối thất bại
         """
         try:
-            from supabase import create_client
-            client = create_client(url.strip(), key.strip())
-            client.table("pinned_clips").select("id").limit(1).execute()
+            self._rest_request(
+                method="GET",
+                path="/pinned_clips?select=id&limit=1",
+                creds=(url.strip(), key.strip()),
+                timeout=10.0,
+            )
             return True, "OK"
-        except ImportError:
-            return False, "Thiếu thư viện supabase: pip install supabase"
+        except urllib.error.HTTPError as e:
+            status = e.code
+            try:
+                err_text = e.read().decode("utf-8", errors="ignore").lower()
+            except Exception:
+                err_text = ""
+
+            if status == 404 or ("relation" in err_text and "does not exist" in err_text):
+                return False, "TABLE_NOT_FOUND"
+            if status in (401, 403) or "jwt" in err_text or "invalid api key" in err_text:
+                return False, "API Key không hợp lệ"
+            if "relation" in err_text and "not exist" in err_text:
+                return False, "TABLE_NOT_FOUND"
+
+            return False, f"Lỗi HTTP {status}: {err_text[:100]}"
+        except urllib.error.URLError as e:
+            return False, "Không kết nối được. Kiểm tra URL và internet"
         except Exception as e:
             err = str(e).lower()
             if "relation" in err and "does not exist" in err:
                 return False, "TABLE_NOT_FOUND"
-            if "invalid api key" in err or "invalid jwt" in err:
-                return False, "API Key không hợp lệ"
-            if "connection" in err or "network" in err or "resolve" in err:
-                return False, "Không kết nối được. Kiểm tra URL và internet"
             return False, f"Lỗi: {str(e)[:120]}"
 
     # ── Thao tác Push (Local → Cloud) ──────────
@@ -246,29 +285,30 @@ class SyncManager:
     def push_pin(self, clip: dict) -> bool:
         """
         Đẩy 1 mục vừa được ghim lên cloud.
-        Chạy trong calling thread (thường là GLib main thread).
         Dùng thread riêng để không block UI.
         """
-        client = self._get_client()
-        if not client:
+        if not self.is_configured():
             return False
 
         def _push():
             try:
                 now = _now_iso()
-                client.table("pinned_clips").upsert(
-                    {
-                        "content_hash": clip["content_hash"],
-                        "type": clip["type"],
-                        "content": clip.get("content"),
-                        "char_count": clip.get("char_count", 0),
-                        "line_count": clip.get("line_count", 0),
-                        "created_at": _ts_to_iso(clip.get("created_at", 0)),
-                        "updated_at": now,
-                        "deleted_at": None,
-                    },
-                    on_conflict="content_hash",
-                ).execute()
+                record = {
+                    "content_hash": clip["content_hash"],
+                    "type": clip["type"],
+                    "content": clip.get("content"),
+                    "char_count": clip.get("char_count", 0),
+                    "line_count": clip.get("line_count", 0),
+                    "created_at": _ts_to_iso(clip.get("created_at", 0)),
+                    "updated_at": now,
+                    "deleted_at": None,
+                }
+                self._rest_request(
+                    method="POST",
+                    path="/pinned_clips?on_conflict=content_hash",
+                    data=record,
+                    extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                )
             except Exception as e:
                 print(f"[Sync] push_pin error: {e}")
 
@@ -280,16 +320,19 @@ class SyncManager:
         Đánh dấu soft-delete khi user bỏ ghim một mục.
         Các máy khác sẽ nhận thay đổi này qua pull_changes_since().
         """
-        client = self._get_client()
-        if not client:
+        if not self.is_configured():
             return False
 
         def _unpin():
             try:
                 now = _now_iso()
-                client.table("pinned_clips").update(
-                    {"deleted_at": now, "updated_at": now}
-                ).eq("content_hash", content_hash).execute()
+                quoted_hash = urllib.parse.quote(content_hash)
+                self._rest_request(
+                    method="PATCH",
+                    path=f"/pinned_clips?content_hash=eq.{quoted_hash}",
+                    data={"deleted_at": now, "updated_at": now},
+                    extra_headers={"Prefer": "return=minimal"},
+                )
             except Exception as e:
                 print(f"[Sync] push_unpin error: {e}")
 
@@ -303,18 +346,14 @@ class SyncManager:
         Kéo toàn bộ pinned items đang active từ cloud về.
         Dùng cho initial sync lần đầu kết nối.
         """
-        client = self._get_client()
-        if not client:
+        if not self.is_configured():
             return []
         try:
-            result = (
-                client.table("pinned_clips")
-                .select("*")
-                .is_("deleted_at", "null")
-                .order("updated_at", desc=True)
-                .execute()
+            data = self._rest_request(
+                method="GET",
+                path="/pinned_clips?select=*&deleted_at=is.null&order=updated_at.desc",
             )
-            return result.data or []
+            return data if isinstance(data, list) else []
         except Exception as e:
             print(f"[Sync] pull_all error: {e}")
             return []
@@ -324,17 +363,15 @@ class SyncManager:
         Kéo chỉ những thay đổi sau lần sync cuối.
         Bao gồm cả các mục bị soft-delete (để sync bỏ ghim).
         """
-        client = self._get_client()
-        if not client:
+        if not self.is_configured():
             return []
         try:
-            result = (
-                client.table("pinned_clips")
-                .select("*")
-                .gt("updated_at", iso_timestamp)
-                .execute()
+            quoted_ts = urllib.parse.quote(iso_timestamp)
+            data = self._rest_request(
+                method="GET",
+                path=f"/pinned_clips?select=*&updated_at=gt.{quoted_ts}",
             )
-            return result.data or []
+            return data if isinstance(data, list) else []
         except Exception as e:
             print(f"[Sync] pull_changes_since error: {e}")
             return []
@@ -373,9 +410,7 @@ class SyncManager:
             # 2. Push local pinned lên cloud (để máy khác nhận)
             local_pinned = self.db.get_pinned_for_sync()
             pushed = 0
-            client = self._get_client()
-            if client and local_pinned:
-                now = _now_iso()
+            if local_pinned:
                 records = [
                     {
                         "content_hash": clip["content_hash"],
@@ -390,9 +425,12 @@ class SyncManager:
                     for clip in local_pinned
                 ]
                 try:
-                    client.table("pinned_clips").upsert(
-                        records, on_conflict="content_hash"
-                    ).execute()
+                    self._rest_request(
+                        method="POST",
+                        path="/pinned_clips?on_conflict=content_hash",
+                        data=records,
+                        extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                    )
                     pushed = len(records)
                 except Exception as e:
                     print(f"[Sync] batch push error: {e}")
