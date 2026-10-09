@@ -9,6 +9,8 @@ prime/
 .snapcraft/
 src-tauri/target/
 target/
+node_modules/
+
 
 # Python cache & bytecode
 __pycache__/

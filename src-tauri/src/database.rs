@@ -40,6 +40,7 @@ pub struct Stats {
     pub pinned: i64,
 }
 
+#[allow(dead_code)]
 pub struct Database {
     conn: Mutex<Connection>,
     db_path: PathBuf,
@@ -262,7 +263,7 @@ impl Database {
 
         if unpinned_cnt > max_items {
             let overflow = unpinned_cnt - max_items;
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(
                     "SELECT id, image_path FROM clips WHERE is_pinned = 0 ORDER BY updated_at ASC LIMIT ?1",
                 )
