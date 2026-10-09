@@ -48,6 +48,7 @@ class SettingsDialog(Adw.PreferencesWindow):
         self._updating_combo = False
         self._updating_lang = False
         self._updating_theme = False
+        self._updating_limit = False
 
         self._build_ui()
         self._update_localized_texts()
@@ -155,9 +156,6 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.group_storage = Adw.PreferencesGroup()
 
         self.limit_row = Adw.ComboRow()
-        cur_limit = self.db.get_setting("max_history", "200")
-        mapping = {"50": 0, "100": 1, "200": 2, "500": 3, "1000": 4}
-        self.limit_row.set_selected(mapping.get(cur_limit, 2))
         self.limit_row.connect("notify::selected", self._on_limit_changed)
         self.group_storage.add(self.limit_row)
 
@@ -271,9 +269,14 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.limit_row.set_subtitle(t("row_max_items_sub", self.lang))
         unit = "items" if self.lang == "en" else "mục"
         limit_options = [f"50 {unit}", f"100 {unit}", f"200 {unit}", f"500 {unit}", f"1000 {unit}"]
-        cur_sel = self.limit_row.get_selected()
+        cur_limit = self.db.get_setting("max_history", "200")
+        mapping = {"50": 0, "100": 1, "200": 2, "500": 3, "1000": 4}
+        target_idx = mapping.get(str(cur_limit), 2)
+
+        self._updating_limit = True
         self.limit_row.set_model(Gtk.StringList.new(limit_options))
-        self.limit_row.set_selected(cur_sel)
+        self.limit_row.set_selected(target_idx)
+        self._updating_limit = False
 
         # Danger Group
         self.group_danger.set_title(t("group_danger", self.lang))
@@ -378,11 +381,14 @@ class SettingsDialog(Adw.PreferencesWindow):
         setup_autostart(switch.get_active())
 
     def _on_limit_changed(self, combo, gparam):
+        if self._updating_limit:
+            return
         vals = ["50", "100", "200", "500", "1000"]
         idx = combo.get_selected()
         if 0 <= idx < len(vals):
             self.db.set_setting("max_history", vals[idx])
-            self.on_settings_changed()
+            if self.on_settings_changed:
+                self.on_settings_changed()
 
     def _on_clear_unpinned(self, btn):
         self.db.clear_unpinned()

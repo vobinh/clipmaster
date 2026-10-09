@@ -338,10 +338,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.lang = self.db.get_setting("language", "vi")
         self._update_localized_texts()
 
+        try:
+            max_limit = int(self.db.get_setting("max_history", "200"))
+        except (ValueError, TypeError):
+            max_limit = 200
+
         clips = self.db.get_clips(
             filter_type=self.current_filter,
             query=self.current_query,
-            limit=120
+            limit=max_limit
         )
 
         # Clear existing rows
