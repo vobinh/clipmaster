@@ -689,4 +689,169 @@ impl Database {
     pub fn disable_notes_pin(&self) {
         self.set_setting("notes_pin_enabled", "0").ok();
     }
+
+    // ── Cloud Sync Helpers ──────────────────────────────
+    pub fn get_pinned_for_sync(&self) -> Result<Vec<ClipItem>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, type, content, content_hash, image_path, image_width, image_height,
+                    char_count, line_count, is_pinned, created_at, updated_at
+             FROM clips
+             WHERE is_pinned = 1 AND type != 'image'
+             ORDER BY updated_at DESC",
+        )?;
+
+        let iter = stmt.query_map([], |row| {
+            Ok(ClipItem {
+                id: row.get(0)?,
+                r#type: row.get(1)?,
+                content: row.get(2)?,
+                content_hash: row.get(3)?,
+                image_path: row.get(4)?,
+                image_width: row.get(5)?,
+                image_height: row.get(6)?,
+                char_count: row.get(7)?,
+                line_count: row.get(8)?,
+                is_pinned: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        })?;
+
+        let mut items = Vec::new();
+        for item in iter {
+            if let Ok(i) = item {
+                items.push(i);
+            }
+        }
+        Ok(items)
+    }
+
+    pub fn upsert_clip_from_cloud(&self, remote_item: &ClipItem) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let existing_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM clips WHERE content_hash = ?1",
+                params![&remote_item.content_hash],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(id) = existing_id {
+            conn.execute(
+                "UPDATE clips SET is_pinned = 1, updated_at = ?1 WHERE id = ?2",
+                params![remote_item.updated_at, id],
+            )?;
+            Ok(false)
+        } else {
+            conn.execute(
+                "INSERT INTO clips (type, content, content_hash, image_path, image_width, image_height,
+                                    char_count, line_count, is_pinned, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, NULL, 0, 0, ?4, ?5, 1, ?6, ?7)",
+                params![
+                    &remote_item.r#type,
+                    &remote_item.content,
+                    &remote_item.content_hash,
+                    remote_item.char_count,
+                    remote_item.line_count,
+                    remote_item.created_at,
+                    remote_item.updated_at,
+                ],
+            )?;
+            Ok(true)
+        }
+    }
+
+    pub fn unpin_clip_by_hash(&self, content_hash: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute(
+            "UPDATE clips SET is_pinned = 0 WHERE content_hash = ?1",
+            params![content_hash],
+        )?;
+        Ok(affected > 0)
+    }
+
+    pub fn get_all_notes_for_sync(&self) -> Result<Vec<NoteItem>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, title, content, content_hash, is_pinned, color, created_at, updated_at
+             FROM notes
+             ORDER BY updated_at DESC",
+        )?;
+
+        let iter = stmt.query_map([], |row| {
+            Ok(NoteItem {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                content: row.get(2)?,
+                content_hash: row.get(3)?,
+                is_pinned: row.get(4)?,
+                color: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?;
+
+        let mut notes = Vec::new();
+        for n in iter {
+            if let Ok(note) = n {
+                notes.push(note);
+            }
+        }
+        Ok(notes)
+    }
+
+    pub fn upsert_note_from_cloud(&self, remote_note: &NoteItem) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let existing: Option<(i64, f64)> = conn
+            .query_row(
+                "SELECT id, updated_at FROM notes WHERE content_hash = ?1",
+                params![&remote_note.content_hash],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .ok();
+
+        if let Some((id, local_updated)) = existing {
+            if remote_note.updated_at > local_updated {
+                conn.execute(
+                    "UPDATE notes SET title = ?1, content = ?2, is_pinned = ?3, color = ?4, updated_at = ?5 WHERE id = ?6",
+                    params![
+                        &remote_note.title,
+                        &remote_note.content,
+                        remote_note.is_pinned,
+                        &remote_note.color,
+                        remote_note.updated_at,
+                        id,
+                    ],
+                )?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            conn.execute(
+                "INSERT INTO notes (title, content, content_hash, is_pinned, color, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    &remote_note.title,
+                    &remote_note.content,
+                    &remote_note.content_hash,
+                    remote_note.is_pinned,
+                    &remote_note.color,
+                    remote_note.created_at,
+                    remote_note.updated_at,
+                ],
+            )?;
+            Ok(true)
+        }
+    }
+
+    pub fn delete_note_by_hash(&self, content_hash: &str) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute(
+            "DELETE FROM notes WHERE content_hash = ?1",
+            params![content_hash],
+        )?;
+        Ok(affected > 0)
+    }
 }

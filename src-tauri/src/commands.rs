@@ -279,12 +279,27 @@ pub fn set_autostart(state: State<AppState>, enabled: bool) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn test_sync_connection(state: State<AppState>) -> Result<String, String> {
-    let url = state.db.get_setting("sync_url", "");
-    if url.trim().is_empty() {
-        return Err("Vui lòng cấu hình URL máy chủ trước khi kiểm tra".to_string());
-    }
-    Ok("Đã lưu cấu hình máy chủ đồng bộ (Sẵn sàng)".to_string())
+pub async fn test_sync_connection(
+    state: State<'_, AppState>,
+    url: Option<String>,
+    key: Option<String>,
+) -> Result<String, String> {
+    let final_url = url.unwrap_or_else(|| state.db.get_setting("sync_url", ""));
+    let final_key = key.unwrap_or_else(|| state.db.get_setting("sync_token", ""));
+    crate::sync::test_connection(&final_url, &final_key).await
+}
+
+#[tauri::command]
+pub async fn auto_setup_sync_schema(
+    url: String,
+    pat: String,
+) -> Result<String, String> {
+    crate::sync::auto_setup_schema(&url, &pat).await
+}
+
+#[tauri::command]
+pub async fn sync_now(state: State<'_, AppState>) -> Result<String, String> {
+    crate::sync::sync_now(&state.db).await
 }
 
 // ── Window Controls & Actions ──────────────────────────

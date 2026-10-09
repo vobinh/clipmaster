@@ -166,6 +166,7 @@ const I18N = {
     sync_dir_push: "Chỉ tải lên máy chủ",
     sync_dir_pull: "Chỉ tải về từ máy chủ",
     btn_test_sync: "Kiểm tra kết nối",
+    btn_sync_now: "Đồng bộ ngay",
 
     // Settings Maintenance
     sec_cleanup: "Dọn dẹp dữ liệu",
@@ -200,7 +201,11 @@ const I18N = {
     toast_note_pasted: "Đã dán ghi chú!",
     toast_note_saved: "Đã lưu ghi chú thành công!",
     toast_pin_saved: "Đã lưu mã PIN bảo mật!",
+    toast_pin_changed: "Đổi mã PIN thành công!",
+    toast_pin_enabled: "Đã bật bảo vệ bằng mã PIN!",
     toast_pin_disabled: "Đã tắt bảo vệ bằng mã PIN!",
+    toast_sync_success: "Đồng bộ đám mây thành công!",
+    toast_sync_failed: "Lỗi đồng bộ đám mây!",
     toast_settings_saved: "Đã lưu toàn bộ cài đặt!",
     toast_defaults_restored: "Đã khôi phục cài đặt gốc!",
     toast_cleaned: "Đã dọn dẹp {count} mục.",
@@ -377,6 +382,7 @@ const I18N = {
     sync_dir_push: "Upload only (Push)",
     sync_dir_pull: "Download only (Pull)",
     btn_test_sync: "Test Connection",
+    btn_sync_now: "Sync Now",
 
     // Settings Maintenance
     sec_cleanup: "Data Maintenance",
@@ -410,8 +416,12 @@ const I18N = {
     image_load_failed: "Failed to load image",
     toast_note_pasted: "Note pasted!",
     toast_note_saved: "Note saved successfully!",
-    toast_pin_saved: "PIN code updated!",
+    toast_pin_saved: "PIN code saved successfully!",
+    toast_pin_changed: "PIN changed successfully!",
+    toast_pin_enabled: "PIN protection enabled!",
     toast_pin_disabled: "PIN protection disabled!",
+    toast_sync_success: "Cloud sync completed successfully!",
+    toast_sync_failed: "Cloud sync failed!",
     toast_settings_saved: "Settings saved successfully!",
     toast_defaults_restored: "Factory settings restored!",
     toast_cleaned: "Cleaned {count} items.",

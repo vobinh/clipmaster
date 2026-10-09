@@ -1,6 +1,7 @@
 mod clipboard;
 mod commands;
 mod database;
+mod sync;
 
 use std::sync::Arc;
 use commands::*;
@@ -50,6 +51,8 @@ pub fn run() {
             reset_settings,
             set_autostart,
             test_sync_connection,
+            auto_setup_sync_schema,
+            sync_now,
             hide_window,
             close_window,
             drag_window,

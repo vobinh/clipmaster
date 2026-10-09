@@ -419,8 +419,9 @@ let toastTimer = null;
 function showToast(message, type = 'success') {
   if (!DOM.toast) return;
   const icon = document.getElementById('toast-icon');
-  if (DOM.toastText) DOM.toastText.textContent = message;
-  else DOM.toast.textContent = message;
+  const toastMsg = (message && typeof message === 'string') ? message : t('toast_pin_saved');
+  if (DOM.toastText) DOM.toastText.textContent = toastMsg;
+  else DOM.toast.textContent = toastMsg;
 
   if (icon) {
     if (type === 'error') icon.className = 'ri-error-warning-fill';
@@ -1167,6 +1168,16 @@ async function openSettingsModal() {
   if (elSyncUrl) elSyncUrl.value = syncUrl;
   if (elSyncToken) elSyncToken.value = syncToken;
   if (elSyncDirection) elSyncDirection.value = syncDirection;
+
+  const lastSyncAt = parseFloat(settings.last_sync_at || '0');
+  const syncStatusText = document.getElementById('sync-status-text');
+  if (syncStatusText) {
+    if (lastSyncAt > 0) {
+      syncStatusText.textContent = `Lần đồng bộ gần nhất: ${formatDate(lastSyncAt)}`;
+    } else {
+      syncStatusText.textContent = 'Mô hình BYOS: Nhập URL + API Key rồi bấm "Kiểm tra kết nối" hoặc "Đồng bộ ngay".';
+    }
+  }
 }
 
 function closeSettingsModal() {
@@ -1350,7 +1361,7 @@ function setupPinDialog() {
         if (pinDialogState.onSaved) {
           await pinDialogState.onSaved();
         } else {
-          showToast(t('toast_pin_saved'));
+          showToast(pinDialogState.hasExistingPin ? t('toast_pin_changed') : t('toast_pin_saved'));
         }
       } catch (err) {
         showPinModalError(err?.toString() || "Lỗi lưu mã PIN", inputNew);
@@ -1468,17 +1479,85 @@ function setupSettingsModal() {
     });
   }
 
-  // Test Sync
+  // Test Sync Connection
   const btnTestSync = document.getElementById('btn-test-sync');
   if (btnTestSync) {
     btnTestSync.addEventListener('click', async () => {
       const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
+      const syncToken = document.getElementById('setting-sync-token')?.value.trim() || '';
       await invoke('set_setting', { key: 'sync_url', value: syncUrl });
+      await invoke('set_setting', { key: 'sync_token', value: syncToken });
+
+      const statusText = document.getElementById('sync-status-text');
+      if (statusText) statusText.textContent = "Đang kiểm tra kết nối máy chủ Supabase...";
+
       try {
-        const msg = await invoke('test_sync_connection');
+        const msg = await invoke('test_sync_connection', { url: syncUrl, key: syncToken });
         showToast(msg);
+        if (statusText) statusText.textContent = msg;
       } catch (err) {
-        showToast(err?.toString() || "Lỗi kiểm tra kết nối", 'error');
+        const errMsg = err?.toString() || "Lỗi kiểm tra kết nối";
+        showToast(errMsg, 'error');
+        if (statusText) statusText.textContent = errMsg;
+      }
+    });
+  }
+
+  // Auto Setup Sync Schema via PAT
+  const btnAutoSetupSync = document.getElementById('btn-auto-setup-sync');
+  if (btnAutoSetupSync) {
+    btnAutoSetupSync.addEventListener('click', async () => {
+      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
+      if (!syncUrl) {
+        showToast("Vui lòng nhập Supabase Project URL trước!", 'error');
+        return;
+      }
+      const pat = window.prompt("Nhập Personal Access Token (PAT) từ Supabase để tự động tạo bảng:\n(Lấy tại: https://supabase.com/dashboard/account/tokens)");
+      if (!pat || !pat.trim()) return;
+
+      const statusText = document.getElementById('sync-status-text');
+      if (statusText) statusText.textContent = "Đang tự động khởi tạo bảng 'pinned_clips' và 'user_notes'...";
+
+      try {
+        const msg = await invoke('auto_setup_sync_schema', { url: syncUrl, pat: pat.trim() });
+        showToast(msg);
+        if (statusText) statusText.textContent = msg;
+      } catch (err) {
+        const errMsg = err?.toString() || "Lỗi khởi tạo bảng";
+        showToast(errMsg, 'error');
+        if (statusText) statusText.textContent = errMsg;
+      }
+    });
+  }
+
+  // Sync Now Button
+  const btnSyncNow = document.getElementById('btn-sync-now');
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener('click', async () => {
+      const syncToggle = document.getElementById('setting-sync-toggle');
+      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
+      const syncToken = document.getElementById('setting-sync-token')?.value.trim() || '';
+      const syncDirection = document.getElementById('setting-sync-direction')?.value || 'bidirectional';
+
+      if (syncToggle) syncToggle.checked = true;
+      await invoke('set_setting', { key: 'sync_enabled', value: '1' });
+      await invoke('set_setting', { key: 'sync_url', value: syncUrl });
+      await invoke('set_setting', { key: 'sync_token', value: syncToken });
+      await invoke('set_setting', { key: 'sync_direction', value: syncDirection });
+
+      const statusText = document.getElementById('sync-status-text');
+      if (statusText) statusText.textContent = "Đang tiến hành đồng bộ dữ liệu đám mây...";
+
+      try {
+        const msg = await invoke('sync_now');
+        showToast(msg);
+        if (statusText) statusText.textContent = msg;
+        await loadClips();
+        if (state.mode === 'notes') await loadNotes();
+      } catch (err) {
+        const errMsg = err?.toString() || "Lỗi đồng bộ";
+        showToast(errMsg, 'error');
+        if (statusText) statusText.textContent = errMsg;
       }
     });
   }
@@ -1826,6 +1905,22 @@ async function init() {
 
   // Initial load
   await loadClips();
+
+  // Auto-sync on startup if enabled
+  try {
+    const syncEnabled = await invoke('get_setting', { key: 'sync_enabled', default_val: '0' });
+    if (syncEnabled === '1') {
+      invoke('sync_now').then(async (msg) => {
+        console.log("[Sync Startup]:", msg);
+        await loadClips();
+        if (state.mode === 'notes') await loadNotes();
+      }).catch(err => {
+        console.warn("[Sync Startup Error]:", err);
+      });
+    }
+  } catch (e) {
+    // Ignore
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

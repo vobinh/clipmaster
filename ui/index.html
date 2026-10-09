@@ -429,13 +429,18 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" data-i18n="sync_url_label">URL Máy chủ (Sync Server URL)</label>
-            <input type="text" class="form-input" id="setting-sync-url" placeholder="https://sync.clipmaster.io hoặc IP cá nhân" />
+            <label class="form-label" data-i18n="sync_url_label">URL Dự án Supabase (Project URL)</label>
+            <input type="text" class="form-input" id="setting-sync-url" placeholder="https://xyzproject.supabase.co" autocomplete="off" />
           </div>
 
           <div class="form-group">
-            <label class="form-label" data-i18n="sync_token_label">Mã xác thực (API Token / Key)</label>
-            <input type="password" class="form-input" id="setting-sync-token" placeholder="Nhập API token bí mật" />
+            <label class="form-label" data-i18n="sync_token_label">Khóa API công khai (anon public key)</label>
+            <div class="pin-input-peek-wrapper">
+              <input type="password" class="form-input" id="setting-sync-token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." autocomplete="off" />
+              <button type="button" class="btn-peek" data-target="setting-sync-token" title="Hiện/ẩn API Key">
+                <i class="ri-eye-line"></i>
+              </button>
+            </div>
           </div>
 
           <div class="settings-row">
@@ -450,11 +455,24 @@
             </select>
           </div>
 
-          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap;">
             <button class="btn-secondary" id="btn-test-sync">
               <i class="ri-wifi-line"></i>
               <span data-i18n="btn_test_sync">Kiểm tra kết nối</span>
             </button>
+            <button class="btn-secondary" id="btn-auto-setup-sync" title="Tự động tạo bảng bằng Personal Access Token (PAT)">
+              <i class="ri-magic-line"></i>
+              <span>Khởi tạo bảng (PAT)</span>
+            </button>
+            <button class="btn-primary" id="btn-sync-now">
+              <i class="ri-refresh-line"></i>
+              <span data-i18n="btn_sync_now">Đồng bộ ngay</span>
+            </button>
+          </div>
+
+          <div class="settings-tip-box" id="sync-status-box" style="margin-top: 8px; font-size: 11px;">
+            <i class="ri-cloud-line" style="color: var(--accent); margin-right: 4px;"></i>
+            <span id="sync-status-text">Mô hình BYOS (Bring Your Own Supabase): Dữ liệu được bảo mật hoàn toàn trên dự án cá nhân của bạn.</span>
           </div>
         </div>
 
