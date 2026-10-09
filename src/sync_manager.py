@@ -321,29 +321,30 @@ class SyncManager:
         """
         creds = (url.strip(), key.strip())
 
-        # 1. Kiểm tra tồn tại bảng
-        try:
-            self._rest_request(
-                method="GET",
-                path="/pinned_clips?select=id&limit=1",
-                creds=creds,
-                timeout=10.0,
-            )
-        except RuntimeError as e:
-            err = str(e).lower()
-            if "rls_blocked" in err:
-                return False, "RLS_BLOCKED"
-            if "relation" in err and "does not exist" in err:
-                return False, "TABLE_NOT_FOUND"
-            if "404" in err:
-                return False, "TABLE_NOT_FOUND"
-            if "401" in err or "403" in err or "jwt" in err or "invalid api key" in err:
-                return False, "API Key không hợp lệ"
-            return False, str(e)[:120]
-        except urllib.error.URLError:
-            return False, "Không kết nối được. Kiểm tra URL và internet"
-        except Exception as e:
-            return False, f"Lỗi: {str(e)[:120]}"
+        # 1. Kiểm tra tồn tại các bảng cần thiết (pinned_clips & user_notes)
+        for tbl in ("pinned_clips", "user_notes"):
+            try:
+                self._rest_request(
+                    method="GET",
+                    path=f"/{tbl}?select=id&limit=1",
+                    creds=creds,
+                    timeout=10.0,
+                )
+            except RuntimeError as e:
+                err = str(e).lower()
+                if "rls_blocked" in err:
+                    return False, "RLS_BLOCKED"
+                if "relation" in err and "does not exist" in err:
+                    return False, "TABLE_NOT_FOUND"
+                if "404" in err:
+                    return False, "TABLE_NOT_FOUND"
+                if "401" in err or "403" in err or "jwt" in err or "invalid api key" in err:
+                    return False, "API Key không hợp lệ"
+                return False, str(e)[:120]
+            except urllib.error.URLError:
+                return False, "Không kết nối được. Kiểm tra URL và internet"
+            except Exception as e:
+                return False, f"Lỗi: {str(e)[:120]}"
 
         # 2. Kiểm tra quyền ghi (thử probe upsert)
         probe_hash = "__clipmaster_probe__"
