@@ -4,6 +4,7 @@ Floating clipboard history popup inspired by Windows + V.
 """
 
 import os
+import time
 from typing import Dict, Any, Optional
 
 import gi
@@ -44,6 +45,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_query = ""
         self._filter_buttons = {}
         self._notes_filter_buttons = {}
+        self._notes_unlocked_until: float = 0.0
 
         # Apply saved theme mode
         apply_theme_mode(self.db.get_setting("theme_mode", "dark"))
@@ -287,7 +289,31 @@ class MainWindow(Adw.ApplicationWindow):
         empty_box.append(self.empty_create_note_btn)
 
         self.stack.add_named(empty_box, "empty")
-        main_box.append(self.stack)
+
+        # PIN Lock State (Khóa bảo vệ Ghi chú)
+        pin_lock_widget = self._build_pin_lock_widget()
+        self.stack.add_named(pin_lock_widget, "pin_lock")
+
+        # Content Overlay to host the Floating Action Button (FAB)
+        self.content_overlay = Gtk.Overlay()
+        self.content_overlay.set_child(self.stack)
+        self.content_overlay.set_vexpand(True)
+        self.content_overlay.set_hexpand(True)
+
+        # Floating Action Button (FAB) tạo ghi chú góc phải
+        self.fab_create_note = Gtk.Button()
+        self.fab_create_note.add_css_class("fab-btn")
+        self.fab_create_note.set_icon_name("list-add-symbolic")
+        self.fab_create_note.set_tooltip_text(t("tooltip_create_note", self.lang))
+        self.fab_create_note.set_halign(Gtk.Align.END)
+        self.fab_create_note.set_valign(Gtk.Align.END)
+        self.fab_create_note.set_margin_end(22)
+        self.fab_create_note.set_margin_bottom(20)
+        self.fab_create_note.connect("clicked", self._on_open_create_note_dialog)
+        self.fab_create_note.set_visible(False)
+        self.content_overlay.add_overlay(self.fab_create_note)
+
+        main_box.append(self.content_overlay)
 
         # 5. Bottom Status Bar
         status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -406,6 +432,14 @@ class MainWindow(Adw.ApplicationWindow):
         for k, (btn, trans_key) in self._notes_filter_buttons.items():
             btn.set_label(t(trans_key, self.lang))
 
+        if hasattr(self, "fab_create_note"):
+            self.fab_create_note.set_tooltip_text(t("tooltip_create_note", self.lang))
+
+        if hasattr(self, "pin_lock_title"):
+            self.pin_lock_title.set_text(t("pin_lock_title", self.lang))
+            self.pin_lock_sub.set_text(t("pin_lock_subtitle", self.lang))
+            self.pin_unlock_btn.set_label(t("btn_unlock", self.lang))
+
     def _update_theme_btn_ui(self):
         sm = Adw.StyleManager.get_default()
         if sm.get_dark():
@@ -424,6 +458,116 @@ class MainWindow(Adw.ApplicationWindow):
         toast_msg = t("toast_theme_dark" if new_mode == "dark" else "toast_theme_light", self.lang)
         self.show_toast(toast_msg)
 
+    # ─── PIN Security for Notes ──────────────────
+
+    def _is_notes_unlocked(self) -> bool:
+        """Kiểm tra xem phần Ghi chú hiện tại có đang được mở khóa không."""
+        if not self.db.is_notes_pin_enabled():
+            return True
+        timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
+        if timeout_cfg == "0":
+            return False
+        if timeout_cfg == "on_close":
+            return self._notes_unlocked_until > 0.0
+        try:
+            return time.time() < self._notes_unlocked_until
+        except Exception:
+            return False
+
+    def _unlock_notes_session(self):
+        """Mở khóa phiên ghi chú theo cấu hình thời gian."""
+        timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
+        if timeout_cfg == "0":
+            self._notes_unlocked_until = 0.0
+        elif timeout_cfg == "on_close":
+            self._notes_unlocked_until = float("inf")
+        else:
+            try:
+                secs = float(timeout_cfg)
+                self._notes_unlocked_until = time.time() + secs
+            except Exception:
+                self._notes_unlocked_until = time.time() + 300.0
+
+    def _lock_notes(self):
+        """Khóa lại phần ghi chú."""
+        self._notes_unlocked_until = 0.0
+
+    def _check_on_hide(self):
+        """Khóa ghi chú khi đóng/ẩn cửa sổ nếu cấu hình là on_close hoặc 0."""
+        timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
+        if timeout_cfg in ("0", "on_close"):
+            self._lock_notes()
+
+    def _build_pin_lock_widget(self) -> Gtk.Box:
+        """Tạo widget màn hình khóa PIN cho Ghi chú."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        box.add_css_class("pin-lock-box")
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
+
+        icon = Gtk.Image.new_from_icon_name("system-lock-screen-symbolic")
+        icon.set_pixel_size(56)
+        icon.add_css_class("pin-header-icon")
+        box.append(icon)
+
+        self.pin_lock_title = Gtk.Label(label=t("pin_lock_title", self.lang))
+        self.pin_lock_title.add_css_class("pin-lock-title")
+        box.append(self.pin_lock_title)
+
+        self.pin_lock_sub = Gtk.Label(label=t("pin_lock_subtitle", self.lang))
+        self.pin_lock_sub.add_css_class("pin-lock-subtitle")
+        box.append(self.pin_lock_sub)
+
+        input_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        input_box.set_halign(Gtk.Align.CENTER)
+
+        self.pin_lock_entry = Gtk.PasswordEntry()
+        self.pin_lock_entry.add_css_class("pin-lock-entry")
+        self.pin_lock_entry.set_halign(Gtk.Align.CENTER)
+        self.pin_lock_entry.connect("activate", lambda _: self._on_verify_pin_unlock())
+        self.pin_lock_entry.connect("changed", self._on_pin_input_changed)
+        input_box.append(self.pin_lock_entry)
+
+        self.pin_unlock_btn = Gtk.Button(label=t("btn_unlock", self.lang))
+        self.pin_unlock_btn.add_css_class("suggested-action")
+        self.pin_unlock_btn.set_valign(Gtk.Align.CENTER)
+        self.pin_unlock_btn.connect("clicked", lambda _: self._on_verify_pin_unlock())
+        input_box.append(self.pin_unlock_btn)
+
+        box.append(input_box)
+
+        self.pin_error_lbl = Gtk.Label()
+        self.pin_error_lbl.add_css_class("pin-error-lbl")
+        self.pin_error_lbl.set_visible(False)
+        box.append(self.pin_error_lbl)
+
+        return box
+
+    def _on_pin_input_changed(self, entry):
+        text = entry.get_text()
+        digits = "".join(ch for ch in text if ch.isdigit())[:4]
+        if digits != text:
+            entry.set_text(digits)
+            return
+        self.pin_error_lbl.set_visible(False)
+        if len(digits) == 4:
+            self._on_verify_pin_unlock()
+
+    def _on_verify_pin_unlock(self):
+        pin = self.pin_lock_entry.get_text().strip()
+        if not pin:
+            return
+        if self.db.verify_notes_pin(pin):
+            self._unlock_notes_session()
+            self.pin_lock_entry.set_text("")
+            self.pin_error_lbl.set_visible(False)
+            self.reload_history()
+        else:
+            self.pin_error_lbl.set_text(t("pin_error_incorrect", self.lang))
+            self.pin_error_lbl.set_visible(True)
+            self.pin_lock_entry.set_text("")
+            self.pin_lock_entry.grab_focus()
+
     def reload_history(self):
         """Reload clips or notes from SQLite and populate ListBox."""
         # Refresh current language
@@ -438,6 +582,22 @@ class MainWindow(Adw.ApplicationWindow):
             self.list_box.remove(row)
 
         if self.current_mode == "notes":
+            # Kiểm tra bảo mật PIN nếu đã bật
+            if not self._is_notes_unlocked():
+                self.notes_filter_box.set_visible(False)
+                self.fab_create_note.set_visible(False)
+                self.create_note_btn.set_visible(False)
+                self.empty_create_note_btn.set_visible(False)
+                self.stack.set_visible_child_name("pin_lock")
+                self.status_lbl.set_text(t("pin_lock_title", self.lang))
+                GLib.idle_add(self.pin_lock_entry.grab_focus)
+                self._update_record_status_ui()
+                return
+
+            self.notes_filter_box.set_visible(True)
+            self.fab_create_note.set_visible(True)
+            self.create_note_btn.set_visible(False)
+
             notes = self.db.get_notes(
                 query=self.current_query,
                 filter_pinned=(self.notes_filter == "pinned"),
@@ -477,6 +637,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         else:
             # Chế độ Clipboard History
+            self.fab_create_note.set_visible(False)
+            self.create_note_btn.set_visible(False)
             try:
                 max_limit = int(self.db.get_setting("max_history", "200"))
             except (ValueError, TypeError):
@@ -558,6 +720,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.mode_notes_btn.remove_css_class("active")
             self.clear_btn.set_visible(True)
             self.create_note_btn.set_visible(False)
+            self.fab_create_note.set_visible(False)
             self.filter_box.set_visible(True)
             self.notes_filter_box.set_visible(False)
             self._set_search_placeholder(t("search_placeholder", self.lang))
@@ -565,9 +728,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.mode_history_btn.remove_css_class("active")
             self.mode_notes_btn.add_css_class("active")
             self.clear_btn.set_visible(False)
-            self.create_note_btn.set_visible(True)
+            self.create_note_btn.set_visible(False)
             self.filter_box.set_visible(False)
-            self.notes_filter_box.set_visible(True)
             self._set_search_placeholder(t("search_notes_placeholder", self.lang))
 
         self.reload_history()
@@ -712,6 +874,10 @@ class MainWindow(Adw.ApplicationWindow):
                     min_interval_seconds=30.0,
                     on_updated=lambda: GLib.idle_add(self.reload_history),
                 )
+
+    def hide(self):
+        self._check_on_hide()
+        super().hide()
 
     def _on_close_request(self, window):
         self.hide()

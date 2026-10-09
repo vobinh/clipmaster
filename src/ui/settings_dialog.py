@@ -26,6 +26,7 @@ from ..theme_manager import apply_theme_mode, THEME_MODES
 from ..sync_manager import SyncManager
 from .shortcut_dialog import ShortcutRecordDialog
 from .sync_setup_dialog import SyncSetupDialog
+from .pin_dialog import SetPinDialog
 
 
 class SettingsDialog(Adw.PreferencesWindow):
@@ -50,6 +51,8 @@ class SettingsDialog(Adw.PreferencesWindow):
         self._updating_theme = False
         self._updating_limit = False
         self._updating_sync_dir = False
+        self._updating_pin_switch = False
+        self._updating_pin_timeout = False
 
         self._build_ui()
         self._update_localized_texts()
@@ -161,6 +164,30 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.group_storage.add(self.limit_row)
 
         self.page.add(self.group_storage)
+
+        # --- Group 3.5: Bảo mật Ghi chú / Notes Security ---
+        self.group_notes_sec = Adw.PreferencesGroup()
+
+        self.pin_enable_row = Adw.ActionRow()
+        self.pin_switch = Gtk.Switch()
+        self.pin_switch.set_valign(Gtk.Align.CENTER)
+        self.pin_switch.set_active(self.db.is_notes_pin_enabled())
+        self.pin_switch.connect("notify::active", self._on_pin_switch_toggled)
+        self.pin_enable_row.add_suffix(self.pin_switch)
+        self.group_notes_sec.add(self.pin_enable_row)
+
+        self.pin_change_row = Adw.ActionRow()
+        self.change_pin_btn = Gtk.Button()
+        self.change_pin_btn.set_valign(Gtk.Align.CENTER)
+        self.change_pin_btn.connect("clicked", self._on_change_pin_clicked)
+        self.pin_change_row.add_suffix(self.change_pin_btn)
+        self.group_notes_sec.add(self.pin_change_row)
+
+        self.pin_timeout_row = Adw.ComboRow()
+        self.pin_timeout_row.connect("notify::selected", self._on_pin_timeout_changed)
+        self.group_notes_sec.add(self.pin_timeout_row)
+
+        self.page.add(self.group_notes_sec)
 
         # --- Group 4: Đồng bộ đám mây (BYOS Sync) ---
         self.group_sync = Adw.PreferencesGroup()
@@ -290,6 +317,9 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.clear_all_row.set_subtitle(t("row_clear_all_sub", self.lang))
         self.clear_btn.set_label(t("btn_clear_now", self.lang))
 
+        # Notes Security Group
+        self._update_notes_sec_group()
+
         # Sync Group
         self._update_sync_group()
 
@@ -410,6 +440,118 @@ class SettingsDialog(Adw.PreferencesWindow):
             self.db.set_setting("sync_direction", new_dir)
             if self.on_settings_changed:
                 self.on_settings_changed()
+
+    # ─── Notes Security Group ────────────────────
+
+    def _update_notes_sec_group(self):
+        """Cập nhật giao diện nhóm bảo mật ghi chú."""
+        self.group_notes_sec.set_title(t("group_notes_sec", self.lang))
+        self.pin_enable_row.set_title(t("row_pin_enable", self.lang))
+        self.pin_enable_row.set_subtitle(t("row_pin_enable_sub", self.lang))
+
+        is_enabled = self.db.is_notes_pin_enabled()
+        self._updating_pin_switch = True
+        self.pin_switch.set_active(is_enabled)
+        self._updating_pin_switch = False
+
+        self.pin_change_row.set_title(t("row_pin_change", self.lang))
+        self.pin_change_row.set_subtitle(t("row_pin_change_sub", self.lang))
+        self.change_pin_btn.set_label(t("btn_change_pin", self.lang))
+        self.pin_change_row.set_visible(is_enabled)
+
+        self.pin_timeout_row.set_title(t("row_pin_timeout", self.lang))
+        self.pin_timeout_row.set_subtitle(t("row_pin_timeout_sub", self.lang))
+        self.pin_timeout_row.set_visible(is_enabled)
+
+        timeout_options = [
+            t("pin_timeout_0", self.lang),
+            t("pin_timeout_60", self.lang),
+            t("pin_timeout_300", self.lang),
+            t("pin_timeout_900", self.lang),
+            t("pin_timeout_1800", self.lang),
+            t("pin_timeout_close", self.lang),
+        ]
+        cur_timeout = self.db.get_setting("notes_pin_timeout", "300")
+        timeout_map = {"0": 0, "60": 1, "300": 2, "900": 3, "1800": 4, "on_close": 5}
+        target_idx = timeout_map.get(str(cur_timeout), 2)
+
+        self._updating_pin_timeout = True
+        self.pin_timeout_row.set_model(Gtk.StringList.new(timeout_options))
+        self.pin_timeout_row.set_selected(target_idx)
+        self._updating_pin_timeout = False
+
+    def _on_pin_switch_toggled(self, switch, gparam):
+        if self._updating_pin_switch:
+            return
+        active = switch.get_active()
+        if active:
+            # Nếu chưa có mã PIN hash trong DB, mở dialog tạo mới
+            has_hash = bool(self.db.get_setting("notes_pin_hash", "").strip())
+            if has_hash:
+                self.db.set_setting("notes_pin_enabled", "1")
+                self._update_notes_sec_group()
+                self._show_toast(t("toast_pin_enabled", self.lang))
+                if self.on_settings_changed:
+                    self.on_settings_changed()
+            else:
+                def _on_set(new_pin: str):
+                    self.db.set_notes_pin(new_pin)
+                    self._update_notes_sec_group()
+                    self._show_toast(t("toast_pin_enabled", self.lang))
+                    if self.on_settings_changed:
+                        self.on_settings_changed()
+
+                dlg = SetPinDialog(
+                    parent_window=self,
+                    has_existing_pin=False,
+                    verify_current_cb=None,
+                    on_pin_set=_on_set,
+                    lang=self.lang,
+                )
+                def _on_close_check(_widget):
+                    if not self.db.is_notes_pin_enabled():
+                        self._updating_pin_switch = True
+                        self.pin_switch.set_active(False)
+                        self._updating_pin_switch = False
+                dlg.connect("destroy", _on_close_check)
+                dlg.present()
+        else:
+            self.db.disable_notes_pin()
+            self._update_notes_sec_group()
+            self._show_toast(t("toast_pin_disabled", self.lang))
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+    def _on_change_pin_clicked(self, _btn):
+        def _on_pin_changed(new_pin: str):
+            self.db.set_notes_pin(new_pin)
+            self._show_toast(t("toast_pin_changed", self.lang))
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+        dlg = SetPinDialog(
+            parent_window=self,
+            has_existing_pin=True,
+            verify_current_cb=self.db.verify_notes_pin,
+            on_pin_set=_on_pin_changed,
+            lang=self.lang,
+        )
+        dlg.present()
+
+    def _on_pin_timeout_changed(self, combo, gparam):
+        if self._updating_pin_timeout:
+            return
+        vals = ["0", "60", "300", "900", "1800", "on_close"]
+        idx = combo.get_selected()
+        if 0 <= idx < len(vals):
+            self.db.set_setting("notes_pin_timeout", vals[idx])
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
+    def _show_toast(self, message: str, timeout: int = 2):
+        toast = Adw.Toast(title=message)
+        toast.set_timeout(timeout)
+        self.add_toast(toast)
 
     # ─── Sync Group ──────────────────────────────
 

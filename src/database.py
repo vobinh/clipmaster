@@ -79,7 +79,10 @@ class Database:
                 "auto_record": "1",
                 "theme_mode": "dark",
                 "language": "vi",
-                "shortcut": "<Super>v"
+                "shortcut": "<Super>v",
+                "notes_pin_enabled": "0",
+                "notes_pin_hash": "",
+                "notes_pin_timeout": "300"
             }
             for k, v in defaults.items():
                 cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
@@ -560,4 +563,36 @@ class Database:
             deleted = cur.rowcount > 0
             conn.commit()
             return deleted
+
+    # ── Notes Security (Mã PIN bảo vệ Ghi chú) ─────
+
+    def is_notes_pin_enabled(self) -> bool:
+        """Kiểm tra tính năng bảo vệ bằng mã PIN có đang bật không."""
+        enabled = self.get_setting("notes_pin_enabled", "0") == "1"
+        pin_hash = self.get_setting("notes_pin_hash", "").strip()
+        return enabled and bool(pin_hash)
+
+    def set_notes_pin(self, pin: str) -> bool:
+        """Thiết lập mã PIN 4 chữ số mới."""
+        if not pin or len(pin.strip()) != 4 or not pin.strip().isdigit():
+            return False
+        h = hashlib.sha256(pin.strip().encode("utf-8")).hexdigest()
+        self.set_setting("notes_pin_hash", h)
+        self.set_setting("notes_pin_enabled", "1")
+        return True
+
+    def verify_notes_pin(self, pin: str) -> bool:
+        """Kiểm tra mã PIN nhập vào có khớp không."""
+        if not pin:
+            return False
+        saved_hash = self.get_setting("notes_pin_hash", "").strip()
+        if not saved_hash:
+            return False
+        h = hashlib.sha256(pin.strip().encode("utf-8")).hexdigest()
+        return h == saved_hash
+
+    def disable_notes_pin(self) -> None:
+        """Tắt bảo vệ bằng mã PIN."""
+        self.set_setting("notes_pin_enabled", "0")
+
 
