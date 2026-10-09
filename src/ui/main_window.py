@@ -462,6 +462,13 @@ class MainWindow(Adw.ApplicationWindow):
             self.present()
             self.search_entry.grab_focus()
 
+            # Tự động đồng bộ ngầm khi mở cửa sổ (chống spam phím Win+V với debounce/throttling 30s)
+            if self.sync_mgr:
+                self.sync_mgr.trigger_ondemand_sync(
+                    min_interval_seconds=30.0,
+                    on_updated=lambda: GLib.idle_add(self.reload_history),
+                )
+
     def _on_close_request(self, window):
         self.hide()
         return True  # Prevent destroy, keep alive in background

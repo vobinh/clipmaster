@@ -146,6 +146,8 @@ class SyncManager:
         self.db = db
         self.config = SyncConfig()
         self._lock = threading.Lock()
+        self._is_syncing = False
+        self._last_ondemand_ts = 0.0
 
     # ── Trạng thái ──────────────────────────────
 
@@ -410,7 +412,7 @@ class SyncManager:
 
     # ── Thao tác Pull (Cloud → Local) ──────────
 
-    def pull_all(self) -> list[dict]:
+    def pull_all(self, timeout: float = 8.0) -> list[dict]:
         """
         Kéo toàn bộ pinned items đang active từ cloud về.
         Bảo đảm nếu local bị xóa hoặc máy mới cài đặt thì khôi phục đủ 100%.
@@ -421,6 +423,7 @@ class SyncManager:
             data = self._rest_request(
                 method="GET",
                 path="/pinned_clips?select=*&order=updated_at.desc",
+                timeout=timeout,
             )
             return data if isinstance(data, list) else []
         except Exception as e:
@@ -429,7 +432,11 @@ class SyncManager:
 
     # ── Sync hai chiều tổng hợp ─────────────────
 
-    def sync_on_startup(self, on_done: Optional[callable] = None) -> tuple[bool, str]:
+    def sync_on_startup(
+        self,
+        on_done: Optional[callable] = None,
+        timeout: float = 8.0,
+    ) -> tuple[bool, str]:
         """
         Đồng bộ 2 chiều hoàn chỉnh giữa Local SQLite và Supabase Cloud:
         1. Kéo toàn bộ mục trên Cloud về Local (Cloud -> Local).
@@ -463,7 +470,7 @@ class SyncManager:
                     last_sync_ts = 0.0
 
             # 1. Kéo toàn bộ mục trên Cloud về (Cloud -> Local)
-            cloud_items = self.pull_all()
+            cloud_items = self.pull_all(timeout=timeout)
             cloud_hashes = {
                 item["content_hash"]: item
                 for item in cloud_items
@@ -522,6 +529,7 @@ class SyncManager:
                         path="/pinned_clips?on_conflict=content_hash",
                         data=records,
                         extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                        timeout=timeout,
                     )
                     pushed = len(records)
                 except Exception as e:
@@ -566,3 +574,52 @@ class SyncManager:
             kwargs={"on_done": on_done},
             daemon=True,
         ).start()
+
+    def trigger_ondemand_sync(
+        self,
+        min_interval_seconds: float = 30.0,
+        on_updated: Optional[callable] = None,
+    ) -> bool:
+        """
+        Kích hoạt đồng bộ nhẹ khi người dùng mở cửa sổ Win+V.
+        Áp dụng cơ chế Throttling / Debounce:
+        1. Nếu chưa cấu hình Supabase -> Bỏ qua.
+        2. Nếu đang có luồng sync đang chạy -> Bỏ qua (chống chồng chéo luồng).
+        3. Nếu khoảng cách từ lần sync gần nhất < min_interval_seconds -> Bỏ qua (chống spam phím Win+V).
+        4. Chạy trong daemon thread, không block UI thread.
+        5. Timeout mạng ngắn (4.0s) để nếu rớt mạng thì thoát ngay, không treo.
+        6. Chỉ gọi on_updated khi thực sự có thay đổi từ Cloud (pulled > 0 hoặc unpinned > 0).
+
+        Returns:
+            True nếu đã kích hoạt luồng sync, False nếu bị throttle/bỏ qua.
+        """
+        if not self.is_configured():
+            return False
+
+        import time
+        now = time.time()
+
+        with self._lock:
+            if self._is_syncing:
+                return False
+            if (now - self._last_ondemand_ts) < min_interval_seconds:
+                return False
+            self._is_syncing = True
+            self._last_ondemand_ts = now
+
+        def _worker():
+            try:
+                # Timeout ngắn (4.0s)
+                success, msg = self.sync_on_startup(timeout=4.0)
+                # Chỉ reload UI khi thực sự có thay đổi kéo về hoặc bỏ ghim
+                if success and ("↓" in msg or "✕" in msg):
+                    if on_updated:
+                        on_updated()
+            except Exception:
+                pass
+            finally:
+                with self._lock:
+                    self._is_syncing = False
+
+        threading.Thread(target=_worker, daemon=True).start()
+        return True
