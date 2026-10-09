@@ -46,6 +46,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._filter_buttons = {}
         self._notes_filter_buttons = {}
         self._notes_unlocked_until: float = 0.0
+        self._notes_unlocked_this_visit: bool = False
         self._pin_buffer: str = ""
         self.pin_dots = []
 
@@ -497,7 +498,7 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
         if timeout_cfg == "0":
-            return False
+            return self._notes_unlocked_this_visit
         if timeout_cfg == "on_close":
             return self._notes_unlocked_until > 0.0
         try:
@@ -507,8 +508,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _unlock_notes_session(self):
         """Mở khóa phiên ghi chú theo cấu hình thời gian."""
+        self._notes_unlocked_this_visit = True
         timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
         if timeout_cfg == "0":
+            # Khi cấu hình là 0: mở khóa trong phiên xem này,
+            # nhưng sẽ khóa lại ngay khi đổi tab hoặc đóng cửa sổ
             self._notes_unlocked_until = 0.0
         elif timeout_cfg == "on_close":
             self._notes_unlocked_until = float("inf")
@@ -521,12 +525,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _lock_notes(self):
         """Khóa lại phần ghi chú."""
+        self._notes_unlocked_this_visit = False
         self._notes_unlocked_until = 0.0
 
     def _check_on_hide(self):
         """Khóa ghi chú khi đóng/ẩn cửa sổ nếu cấu hình là on_close hoặc 0."""
         timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
-        if timeout_cfg in ("0", "on_close"):
+        if timeout_cfg in ("0", "on_close") or not self._is_notes_unlocked():
             self._lock_notes()
 
     def _build_pin_lock_widget(self) -> Gtk.Box:
@@ -823,6 +828,9 @@ class MainWindow(Adw.ApplicationWindow):
         is_history = (mode == "history")
 
         if is_history:
+            timeout_cfg = self.db.get_setting("notes_pin_timeout", "300")
+            if timeout_cfg == "0":
+                self._lock_notes()
             self.mode_history_btn.add_css_class("active")
             self.mode_notes_btn.remove_css_class("active")
             self.clear_btn.set_visible(True)
