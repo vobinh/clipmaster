@@ -116,6 +116,10 @@ const I18N = {
     // Settings Security
     sec_pin_protect: "Bảo vệ mục Ghi chú",
     row_pin_protect: "Khóa Ghi chú bằng mã PIN",
+    row_pin_protect_sub: "Yêu cầu mã PIN 4 chữ số khi mở tab Ghi chú",
+    row_pin_change: "Đổi mã PIN",
+    row_pin_change_sub: "Thay đổi mã PIN bảo vệ hiện tại",
+    btn_change_pin: "Đổi mã PIN",
     pin_status_on: "Trạng thái: ĐÃ BẬT bảo vệ PIN",
     pin_status_off: "Trạng thái: Chưa bật",
     sec_pin_setup: "Thiết lập mã PIN",
@@ -129,6 +133,25 @@ const I18N = {
     pin_time_900: "15 phút",
     pin_time_1800: "30 phút",
     pin_time_close: "Ngay khi đóng cửa sổ",
+
+    // PIN Dialog Modal
+    pin_dlg_title_set: "Cài đặt mã PIN 4 số",
+    pin_dlg_title_change: "Đổi mã PIN Ghi chú",
+    pin_dlg_current: "Mã PIN hiện tại",
+    pin_dlg_current_placeholder: "Nhập mã PIN đang sử dụng",
+    pin_dlg_new: "Mã PIN mới (4 chữ số)",
+    pin_dlg_new_placeholder: "Nhập 4 chữ số mới",
+    pin_dlg_confirm: "Xác nhận mã PIN mới",
+    pin_dlg_confirm_placeholder: "Nhập lại mã PIN mới",
+    pin_dlg_err_len: "Mã PIN phải gồm đúng 4 chữ số (0-9)!",
+    pin_dlg_err_mismatch: "Mã PIN xác nhận không trùng khớp!",
+    pin_dlg_err_current: "Mã PIN hiện tại không chính xác!",
+    pin_dlg_err_current_empty: "Vui lòng nhập mã PIN hiện tại!",
+
+    // Confirm Dialog
+    confirm_title: "Xác nhận thao tác",
+    confirm_btn_cancel: "Hủy",
+    confirm_btn_ok: "Xác nhận",
 
     // Settings Sync
     sec_sync: "Đồng bộ đám mây (BYOS)",
@@ -303,6 +326,10 @@ const I18N = {
     // Settings Security
     sec_pin_protect: "Protect Notes Section",
     row_pin_protect: "Lock Notes with PIN",
+    row_pin_protect_sub: "Require 4-digit PIN when opening Notes tab",
+    row_pin_change: "Change PIN",
+    row_pin_change_sub: "Change the current protection PIN",
+    btn_change_pin: "Change PIN",
     pin_status_on: "Status: PIN protection ACTIVE",
     pin_status_off: "Status: Disabled",
     sec_pin_setup: "Set PIN Code",
@@ -316,6 +343,25 @@ const I18N = {
     pin_time_900: "15 minutes",
     pin_time_1800: "30 minutes",
     pin_time_close: "Immediately upon window close",
+
+    // PIN Dialog Modal
+    pin_dlg_title_set: "Set 4-Digit PIN",
+    pin_dlg_title_change: "Change Notes PIN",
+    pin_dlg_current: "Current PIN",
+    pin_dlg_current_placeholder: "Enter current PIN",
+    pin_dlg_new: "New 4-Digit PIN",
+    pin_dlg_new_placeholder: "Enter 4 new digits",
+    pin_dlg_confirm: "Confirm New PIN",
+    pin_dlg_confirm_placeholder: "Re-enter new PIN",
+    pin_dlg_err_len: "PIN must be exactly 4 digits (0-9)!",
+    pin_dlg_err_mismatch: "Confirmation PIN does not match!",
+    pin_dlg_err_current: "Current PIN is incorrect!",
+    pin_dlg_err_current_empty: "Please enter current PIN!",
+
+    // Confirm Dialog
+    confirm_title: "Confirm Action",
+    confirm_btn_cancel: "Cancel",
+    confirm_btn_ok: "Confirm",
 
     // Settings Sync
     sec_sync: "Cloud Sync (BYOS)",

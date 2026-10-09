@@ -988,6 +988,200 @@ body {
   transform: translateX(-50%) translateY(-6px);
 }
 
+.toast.error {
+  background: rgba(30, 16, 16, 0.95);
+  color: #fca5a5;
+  border-color: #ef4444;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+}
+
+.toast.success {
+  background: var(--bg-elevated);
+  color: #86efac;
+  border-color: #22c55e;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.25);
+}
+
+.toast.info {
+  background: var(--bg-elevated);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+/* PIN Dialog Modal */
+.pin-dialog-card {
+  width: 90%;
+  max-width: 360px;
+}
+
+.pin-dialog-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-dialog-icon {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.pin-modal-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: shakeError 0.3s ease;
+}
+
+[data-theme="light"] .pin-modal-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.pin-modal-error i {
+  font-size: 15px;
+  flex-shrink: 0;
+  color: #ef4444;
+}
+
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.pin-input-peek-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pin-digit-input {
+  letter-spacing: 4px;
+  padding-right: 36px !important;
+  font-size: 14px;
+}
+
+.btn-peek {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.btn-peek:hover {
+  color: var(--text-primary);
+}
+
+.pin-dialog-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.pin-dialog-hint i {
+  font-size: 13px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+/* Reusable In-App Confirmation Modal */
+.confirm-modal-card {
+  width: 90%;
+  max-width: 360px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confirm-modal-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.confirm-icon-wrapper {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.confirm-icon-wrapper.info {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.confirm-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.confirm-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.confirm-desc {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Settings Window Modal */
 .settings-modal-card {
   width: 95%;

@@ -183,6 +183,12 @@ pub fn is_notes_pin_enabled(state: State<AppState>) -> bool {
 }
 
 #[tauri::command]
+pub fn has_notes_pin(state: State<AppState>) -> bool {
+    let hash = state.db.get_setting("notes_pin_hash", "");
+    !hash.trim().is_empty()
+}
+
+#[tauri::command]
 pub fn verify_notes_pin(state: State<AppState>, pin: String) -> bool {
     state.db.verify_notes_pin(&pin)
 }
@@ -190,6 +196,32 @@ pub fn verify_notes_pin(state: State<AppState>, pin: String) -> bool {
 #[tauri::command]
 pub fn set_notes_pin(state: State<AppState>, pin: String) -> bool {
     state.db.set_notes_pin(&pin)
+}
+
+#[tauri::command]
+pub fn change_notes_pin(
+    state: State<AppState>,
+    old_pin: Option<String>,
+    new_pin: String,
+) -> Result<bool, String> {
+    let hash = state.db.get_setting("notes_pin_hash", "");
+    if !hash.trim().is_empty() {
+        let old = old_pin.ok_or_else(|| "Vui lòng nhập mã PIN hiện tại".to_string())?;
+        if !state.db.verify_notes_pin(&old) {
+            return Err("Mã PIN hiện tại không chính xác!".to_string());
+        }
+    }
+
+    let trimmed = new_pin.trim();
+    if trimmed.len() != 4 || !trimmed.chars().all(|c| c.is_ascii_digit()) {
+        return Err("Mã PIN phải gồm đúng 4 chữ số (0-9)!".to_string());
+    }
+
+    if state.db.set_notes_pin(trimmed) {
+        Ok(true)
+    } else {
+        Err("Không thể cập nhật mã PIN".to_string())
+    }
 }
 
 #[tauri::command]

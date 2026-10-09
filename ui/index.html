@@ -388,19 +388,18 @@
             </label>
           </div>
 
-          <div class="settings-section-title" data-i18n="sec_pin_setup">Thiết lập mã PIN</div>
-          <div class="settings-row" style="flex-direction: column; align-items: stretch;">
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="password" class="form-input" id="setting-new-pin" maxlength="4" data-i18n-placeholder="pin_input_placeholder" placeholder="Nhập mã PIN mới (4 số)" style="flex: 1;" />
-              <button class="btn-primary" id="btn-set-pin" style="padding: 7px 14px;">
-                <i class="ri-shield-check-line"></i>
-                <span data-i18n="btn_save_pin">Lưu mã PIN</span>
-              </button>
+          <div class="settings-row" id="row-change-pin">
+            <div class="settings-row-info">
+              <span class="settings-row-title" data-i18n="row_pin_change">Đổi mã PIN</span>
+              <span class="settings-row-desc" data-i18n="row_pin_change_sub">Thay đổi mã PIN bảo vệ hiện tại</span>
             </div>
-            <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" data-i18n="pin_hint">Mã PIN gồm đúng 4 chữ số (0-9) dùng để bảo vệ quyền riêng tư các ghi chú.</span>
+            <button class="btn-secondary" id="btn-open-pin-dialog" style="padding: 6px 12px;">
+              <i class="ri-key-2-line"></i>
+              <span data-i18n="btn_change_pin">Đổi mã PIN</span>
+            </button>
           </div>
 
-          <div class="settings-row">
+          <div class="settings-row" id="row-pin-timeout">
             <div class="settings-row-info">
               <span class="settings-row-title" data-i18n="row_pin_timeout">Tự động khóa lại sau</span>
               <span class="settings-row-desc" data-i18n="row_pin_timeout_desc">Thời gian không hoạt động trước khi khóa lại</span>
@@ -513,9 +512,97 @@
       </div>
     </div>
 
+    <!-- Set / Change PIN Dialog Modal -->
+    <div class="modal-overlay hidden" id="modal-pin" style="z-index: 120;">
+      <div class="modal-card pin-dialog-card">
+        <div class="modal-header">
+          <div class="pin-dialog-title-group">
+            <i class="ri-shield-keyhole-line pin-dialog-icon"></i>
+            <h3 class="modal-title" id="pin-modal-title" data-i18n="pin_dlg_title_change">Đổi mã PIN Ghi chú</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-pin-modal">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+
+        <div class="modal-body" style="gap: 12px; padding: 16px 20px;">
+          <!-- Inline Error Banner -->
+          <div class="pin-modal-error hidden" id="pin-modal-error">
+            <i class="ri-error-warning-fill"></i>
+            <span id="pin-modal-error-text"></span>
+          </div>
+
+          <!-- Field 1: Current PIN (only when changing existing PIN) -->
+          <div class="form-group" id="group-pin-current">
+            <label class="form-label" data-i18n="pin_dlg_current">Mã PIN hiện tại</label>
+            <div class="pin-input-peek-wrapper">
+              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-current" maxlength="4" placeholder="Nhập mã PIN đang sử dụng" autocomplete="off" />
+              <button type="button" class="btn-peek" data-target="pin-input-current" title="Hiện/ẩn mã PIN">
+                <i class="ri-eye-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Field 2: New PIN -->
+          <div class="form-group">
+            <label class="form-label" id="label-pin-new" data-i18n="pin_dlg_new">Mã PIN mới (4 chữ số)</label>
+            <div class="pin-input-peek-wrapper">
+              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-new" maxlength="4" placeholder="Nhập 4 chữ số mới" autocomplete="off" />
+              <button type="button" class="btn-peek" data-target="pin-input-new" title="Hiện/ẩn mã PIN">
+                <i class="ri-eye-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Field 3: Confirm New PIN -->
+          <div class="form-group">
+            <label class="form-label" data-i18n="pin_dlg_confirm">Xác nhận mã PIN mới</label>
+            <div class="pin-input-peek-wrapper">
+              <input type="password" class="form-input font-mono pin-digit-input" id="pin-input-confirm" maxlength="4" placeholder="Nhập lại mã PIN mới" autocomplete="off" />
+              <button type="button" class="btn-peek" data-target="pin-input-confirm" title="Hiện/ẩn mã PIN">
+                <i class="ri-eye-line"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="pin-dialog-hint">
+            <i class="ri-information-line"></i>
+            <span data-i18n="pin_hint">Mã PIN gồm đúng 4 chữ số (0-9) dùng để bảo vệ quyền riêng tư các ghi chú.</span>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 12px 20px;">
+          <button class="btn-secondary" id="btn-cancel-pin" data-i18n="btn_cancel">Hủy</button>
+          <button class="btn-primary" id="btn-save-pin-modal">
+            <i class="ri-check-line"></i>
+            <span data-i18n="btn_save_pin">Lưu mã PIN</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reusable Confirmation Dialog Modal -->
+    <div class="modal-overlay hidden" id="modal-confirm" style="z-index: 200;">
+      <div class="confirm-modal-card">
+        <div class="confirm-modal-header">
+          <div class="confirm-icon-wrapper" id="confirm-icon-wrapper">
+            <i class="ri-error-warning-fill" id="confirm-icon"></i>
+          </div>
+          <div class="confirm-text-group">
+            <h3 class="confirm-title" id="confirm-title" data-i18n="confirm_title">Xác nhận thao tác</h3>
+            <p class="confirm-desc" id="confirm-desc">Bạn có chắc chắn muốn thực hiện hành động này?</p>
+          </div>
+        </div>
+        <div class="confirm-modal-actions">
+          <button class="btn-secondary" id="btn-confirm-cancel" data-i18n="confirm_btn_cancel">Hủy</button>
+          <button class="btn-danger" id="btn-confirm-ok" data-i18n="confirm_btn_ok">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification -->
     <div class="toast" id="toast">
-      <i class="ri-check-circle-line"></i>
+      <i class="ri-check-circle-line" id="toast-icon"></i>
       <span id="toast-text">Đã sao chép vào bộ nhớ tạm!</span>
     </div>
 

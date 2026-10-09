@@ -121,12 +121,30 @@ async function mockInvoke(cmd, args) {
     }
     case 'is_notes_pin_enabled':
       return mockStore.settings.notes_pin_enabled === "1";
+    case 'has_notes_pin':
+      return !!(mockStore.settings.pin || mockStore.settings.notes_pin_hash);
     case 'verify_notes_pin':
       return args.pin === "1234" || args.pin === mockStore.settings.pin;
     case 'set_notes_pin':
       mockStore.settings.notes_pin_enabled = "1";
       mockStore.settings.pin = args.pin;
       return true;
+    case 'change_notes_pin': {
+      const hasPin = !!(mockStore.settings.pin || mockStore.settings.notes_pin_hash);
+      const oldPin = args.oldPin || args.old_pin;
+      const newPin = args.newPin || args.new_pin;
+      if (hasPin) {
+        if (!oldPin || (oldPin !== "1234" && oldPin !== mockStore.settings.pin)) {
+          throw new Error("Mã PIN hiện tại không chính xác!");
+        }
+      }
+      if (!newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+        throw new Error("Mã PIN phải gồm đúng 4 chữ số (0-9)!");
+      }
+      mockStore.settings.notes_pin_enabled = "1";
+      mockStore.settings.pin = newPin;
+      return true;
+    }
     case 'disable_notes_pin':
       mockStore.settings.notes_pin_enabled = "0";
       return;
@@ -397,14 +415,73 @@ function formatRelativeTime(timestamp) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function showToast(message) {
+let toastTimer = null;
+function showToast(message, type = 'success') {
+  if (!DOM.toast) return;
+  const icon = document.getElementById('toast-icon');
   if (DOM.toastText) DOM.toastText.textContent = message;
   else DOM.toast.textContent = message;
-  
-  DOM.toast.classList.add('show');
-  setTimeout(() => {
+
+  if (icon) {
+    if (type === 'error') icon.className = 'ri-error-warning-fill';
+    else if (type === 'info') icon.className = 'ri-information-fill';
+    else icon.className = 'ri-check-circle-line';
+  }
+
+  DOM.toast.className = `toast show ${type}`;
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
     DOM.toast.classList.remove('show');
-  }, 1800);
+  }, 2200);
+}
+
+// ── Reusable In-App Confirmation Modal ────────────────────────────
+function showConfirmDialog({
+  title = t('confirm_title'),
+  message = '',
+  confirmText = t('confirm_btn_ok'),
+  cancelText = t('confirm_btn_cancel'),
+  isDanger = true,
+  onConfirm = null
+} = {}) {
+  const modal = document.getElementById('modal-confirm');
+  if (!modal) return;
+  const titleEl = document.getElementById('confirm-title');
+  const descEl = document.getElementById('confirm-desc');
+  const btnOk = document.getElementById('btn-confirm-ok');
+  const btnCancel = document.getElementById('btn-confirm-cancel');
+  const iconWrapper = document.getElementById('confirm-icon-wrapper');
+  const icon = document.getElementById('confirm-icon');
+
+  if (titleEl) titleEl.textContent = title;
+  if (descEl) descEl.textContent = message;
+  if (btnOk) btnOk.textContent = confirmText;
+  if (btnCancel) btnCancel.textContent = cancelText;
+
+  if (isDanger) {
+    if (btnOk) btnOk.className = 'btn-danger';
+    if (iconWrapper) iconWrapper.className = 'confirm-icon-wrapper';
+    if (icon) icon.className = 'ri-error-warning-fill';
+  } else {
+    if (btnOk) btnOk.className = 'btn-primary';
+    if (iconWrapper) iconWrapper.className = 'confirm-icon-wrapper info';
+    if (icon) icon.className = 'ri-information-fill';
+  }
+
+  modal.classList.remove('hidden');
+
+  const cleanup = () => {
+    modal.classList.add('hidden');
+    btnOk.onclick = null;
+    btnCancel.onclick = null;
+  };
+
+  btnCancel.onclick = () => cleanup();
+  btnOk.onclick = async () => {
+    cleanup();
+    if (onConfirm) await onConfirm();
+  };
 }
 
 // ── Data Loading & Rendering ───────────────────────────────────────
@@ -981,7 +1058,8 @@ function setupNoteModal() {
   DOM.btnSaveNote.addEventListener('click', async () => {
     const content = DOM.noteInputContent.value.trim();
     if (!content) {
-      alert(t('alert_note_content_empty'));
+      showToast(t('alert_note_content_empty'), 'error');
+      DOM.noteInputContent.focus();
       return;
     }
 
@@ -996,7 +1074,7 @@ function setupNoteModal() {
       loadNotes();
     } catch (err) {
       console.error("Save note failed:", err);
-      alert("Error: " + err);
+      showToast(err?.toString() || "Lỗi lưu ghi chú", 'error');
     }
   });
 }
@@ -1046,15 +1124,21 @@ async function openSettingsModal() {
 
   // Security tab
   const pinEnabled = await invoke('is_notes_pin_enabled');
+  const hasPin = await invoke('has_notes_pin');
   const pinTimeout = settings.notes_pin_timeout || '300';
   const elPinToggle = document.getElementById('setting-pin-toggle');
   const elPinTimeout = document.getElementById('setting-pin-timeout');
   const elPinStatus = document.getElementById('setting-pin-status');
+  const rowChangePin = document.getElementById('row-change-pin');
+
   if (elPinToggle) elPinToggle.checked = pinEnabled;
   if (elPinTimeout) elPinTimeout.value = pinTimeout;
   if (elPinStatus) {
     elPinStatus.textContent = pinEnabled ? t('pin_status_on') : t('pin_status_off');
     elPinStatus.style.color = pinEnabled ? "var(--success)" : "var(--text-tertiary)";
+  }
+  if (rowChangePin) {
+    rowChangePin.style.display = hasPin ? 'flex' : 'none';
   }
 
   // Sync tab
@@ -1074,6 +1158,178 @@ async function openSettingsModal() {
 
 function closeSettingsModal() {
   DOM.modalSettings.classList.add('hidden');
+}
+
+// ── PIN Dialog Modal Logic (Set / Change PIN) ─────────────────────
+let pinDialogState = {
+  hasExistingPin: false,
+  onSaved: null,
+  onCancelled: null
+};
+
+function openPinDialog({ hasExistingPin = false, onSaved = null, onCancelled = null } = {}) {
+  pinDialogState = { hasExistingPin, onSaved, onCancelled };
+
+  const modal = document.getElementById('modal-pin');
+  const titleEl = document.getElementById('pin-modal-title');
+  const groupCurrent = document.getElementById('group-pin-current');
+  const errorBox = document.getElementById('pin-modal-error');
+  const errorText = document.getElementById('pin-modal-error-text');
+  const inputCurrent = document.getElementById('pin-input-current');
+  const inputNew = document.getElementById('pin-input-new');
+  const inputConfirm = document.getElementById('pin-input-confirm');
+
+  if (!modal) return;
+
+  if (titleEl) {
+    titleEl.textContent = hasExistingPin ? t('pin_dlg_title_change') : t('pin_dlg_title_set');
+  }
+
+  if (groupCurrent) {
+    groupCurrent.style.display = hasExistingPin ? 'flex' : 'none';
+  }
+
+  if (inputCurrent) inputCurrent.value = '';
+  if (inputNew) inputNew.value = '';
+  if (inputConfirm) inputConfirm.value = '';
+
+  if (errorBox) errorBox.classList.add('hidden');
+  if (errorText) errorText.textContent = '';
+
+  modal.classList.remove('hidden');
+
+  setTimeout(() => {
+    if (hasExistingPin && inputCurrent) inputCurrent.focus();
+    else if (inputNew) inputNew.focus();
+  }, 60);
+}
+
+function closePinDialog(cancelled = false) {
+  const modal = document.getElementById('modal-pin');
+  if (modal) modal.classList.add('hidden');
+  if (cancelled && pinDialogState.onCancelled) {
+    pinDialogState.onCancelled();
+  }
+}
+
+function showPinModalError(msg, focusEl = null) {
+  const errorBox = document.getElementById('pin-modal-error');
+  const errorText = document.getElementById('pin-modal-error-text');
+  if (errorText) errorText.textContent = msg;
+  if (errorBox) {
+    errorBox.classList.remove('hidden');
+    errorBox.style.animation = 'none';
+    errorBox.offsetHeight;
+    errorBox.style.animation = '';
+  }
+  if (focusEl) focusEl.focus();
+}
+
+function setupPinDialog() {
+  const btnClose = document.getElementById('btn-close-pin-modal');
+  const btnCancel = document.getElementById('btn-cancel-pin');
+  const btnSave = document.getElementById('btn-save-pin-modal');
+  const inputCurrent = document.getElementById('pin-input-current');
+  const inputNew = document.getElementById('pin-input-new');
+  const inputConfirm = document.getElementById('pin-input-confirm');
+
+  if (btnClose) btnClose.addEventListener('click', () => closePinDialog(true));
+  if (btnCancel) btnCancel.addEventListener('click', () => closePinDialog(true));
+
+  // Restrict inputs to 4 digits
+  [inputCurrent, inputNew, inputConfirm].forEach(inp => {
+    if (!inp) return;
+    inp.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    });
+  });
+
+  // Peek buttons (eye toggle)
+  document.querySelectorAll('.btn-peek').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = btn.dataset.target;
+      const targetInput = document.getElementById(targetId);
+      const icon = btn.querySelector('i');
+      if (targetInput && icon) {
+        if (targetInput.type === 'password') {
+          targetInput.type = 'text';
+          icon.className = 'ri-eye-off-line';
+        } else {
+          targetInput.type = 'password';
+          icon.className = 'ri-eye-line';
+        }
+      }
+    });
+  });
+
+  // Save PIN button
+  if (btnSave) {
+    btnSave.addEventListener('click', async () => {
+      const errorBox = document.getElementById('pin-modal-error');
+      if (errorBox) errorBox.classList.add('hidden');
+
+      // 1. If hasExistingPin: check current PIN
+      if (pinDialogState.hasExistingPin) {
+        const curVal = inputCurrent.value.trim();
+        if (!curVal) {
+          showPinModalError(t('pin_dlg_err_current_empty'), inputCurrent);
+          return;
+        }
+        const isOk = await invoke('verify_notes_pin', { pin: curVal });
+        if (!isOk) {
+          showPinModalError(t('pin_dlg_err_current'), inputCurrent);
+          return;
+        }
+      }
+
+      // 2. Check new PIN length
+      const newVal = inputNew.value.trim();
+      if (newVal.length !== 4 || !/^\d{4}$/.test(newVal)) {
+        showPinModalError(t('pin_dlg_err_len'), inputNew);
+        return;
+      }
+
+      // 3. Check confirm PIN
+      const confVal = inputConfirm.value.trim();
+      if (newVal !== confVal) {
+        showPinModalError(t('pin_dlg_err_mismatch'), inputConfirm);
+        return;
+      }
+
+      // 4. Save new PIN via backend
+      try {
+        const oldVal = pinDialogState.hasExistingPin ? inputCurrent.value.trim() : null;
+        await invoke('change_notes_pin', {
+          oldPin: oldVal,
+          old_pin: oldVal,
+          newPin: newVal,
+          new_pin: newVal
+        });
+
+        closePinDialog(false);
+
+        // Refresh settings UI
+        const elPinStatus = document.getElementById('setting-pin-status');
+        const elPinToggle = document.getElementById('setting-pin-toggle');
+        const rowChangePin = document.getElementById('row-change-pin');
+        if (elPinStatus) {
+          elPinStatus.textContent = t('pin_status_on');
+          elPinStatus.style.color = "var(--success)";
+        }
+        if (elPinToggle) elPinToggle.checked = true;
+        if (rowChangePin) rowChangePin.style.display = 'flex';
+
+        if (pinDialogState.onSaved) {
+          await pinDialogState.onSaved();
+        } else {
+          showToast(t('toast_pin_saved'));
+        }
+      } catch (err) {
+        showPinModalError(err?.toString() || "Lỗi lưu mã PIN", inputNew);
+      }
+    });
+  }
 }
 
 function setupSettingsModal() {
@@ -1117,26 +1373,16 @@ function setupSettingsModal() {
     });
   }
 
-  // PIN Save
-  const btnSetPin = document.getElementById('btn-set-pin');
-  const elNewPin = document.getElementById('setting-new-pin');
-  if (btnSetPin && elNewPin) {
-    btnSetPin.addEventListener('click', async () => {
-      const pin = elNewPin.value.trim();
-      if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-        alert(t('alert_pin_length'));
-        return;
-      }
-      await invoke('set_notes_pin', { pin });
-      elNewPin.value = '';
-      const elPinStatus = document.getElementById('setting-pin-status');
-      const elPinToggle = document.getElementById('setting-pin-toggle');
-      if (elPinStatus) {
-        elPinStatus.textContent = t('pin_status_on');
-        elPinStatus.style.color = "var(--success)";
-      }
-      if (elPinToggle) elPinToggle.checked = true;
-      showToast(t('toast_pin_saved'));
+  // Open Change PIN Dialog button
+  const btnOpenPinDialog = document.getElementById('btn-open-pin-dialog');
+  if (btnOpenPinDialog) {
+    btnOpenPinDialog.addEventListener('click', () => {
+      openPinDialog({
+        hasExistingPin: true,
+        onSaved: () => {
+          showToast(t('toast_pin_changed'));
+        }
+      });
     });
   }
 
@@ -1145,6 +1391,8 @@ function setupSettingsModal() {
   if (elPinToggle) {
     elPinToggle.addEventListener('change', async () => {
       const elPinStatus = document.getElementById('setting-pin-status');
+      const rowChangePin = document.getElementById('row-change-pin');
+
       if (!elPinToggle.checked) {
         await invoke('disable_notes_pin');
         state.notesUnlocked = true;
@@ -1154,10 +1402,32 @@ function setupSettingsModal() {
         }
         showToast(t('toast_pin_disabled'));
       } else {
-        alert(t('alert_pin_enter_first'));
-        elPinToggle.checked = false;
-        const elPinInput = document.getElementById('setting-new-pin');
-        if (elPinInput) elPinInput.focus();
+        const hasPin = await invoke('has_notes_pin');
+        if (hasPin) {
+          await invoke('set_setting', { key: 'notes_pin_enabled', value: '1' });
+          if (elPinStatus) {
+            elPinStatus.textContent = t('pin_status_on');
+            elPinStatus.style.color = "var(--success)";
+          }
+          if (rowChangePin) rowChangePin.style.display = 'flex';
+          showToast(t('toast_pin_enabled'));
+        } else {
+          openPinDialog({
+            hasExistingPin: false,
+            onSaved: () => {
+              elPinToggle.checked = true;
+              if (elPinStatus) {
+                elPinStatus.textContent = t('pin_status_on');
+                elPinStatus.style.color = "var(--success)";
+              }
+              if (rowChangePin) rowChangePin.style.display = 'flex';
+              showToast(t('toast_pin_saved'));
+            },
+            onCancelled: () => {
+              elPinToggle.checked = false;
+            }
+          });
+        }
       }
     });
   }
@@ -1172,7 +1442,7 @@ function setupSettingsModal() {
         const msg = await invoke('test_sync_connection');
         showToast(msg);
       } catch (err) {
-        alert("Sync connection error: " + err);
+        showToast(err?.toString() || "Lỗi kiểm tra kết nối", 'error');
       }
     });
   }
@@ -1180,27 +1450,35 @@ function setupSettingsModal() {
   // Maintenance: Clear unpinned
   const btnSettingsClear = document.getElementById('btn-settings-clear-unpinned');
   if (btnSettingsClear) {
-    btnSettingsClear.addEventListener('click', async () => {
-      if (confirm(t('confirm_clear_unpinned'))) {
-        const removed = await invoke('clear_unpinned');
-        showToast(t('toast_cleaned', { count: removed }));
-        await loadClips();
-      }
+    btnSettingsClear.addEventListener('click', () => {
+      showConfirmDialog({
+        title: t('confirm_title'),
+        message: t('confirm_clear_unpinned'),
+        onConfirm: async () => {
+          const removed = await invoke('clear_unpinned');
+          showToast(t('toast_cleaned', { count: removed }));
+          await loadClips();
+        }
+      });
     });
   }
 
   // Maintenance: Reset defaults
   const btnReset = document.getElementById('btn-reset-defaults');
   if (btnReset) {
-    btnReset.addEventListener('click', async () => {
-      if (confirm(t('confirm_reset_settings'))) {
-        await invoke('reset_settings');
-        applyLanguage('vi');
-        updateThemeUI('dark');
-        showToast(t('toast_defaults_restored'));
-        closeSettingsModal();
-        await loadClips();
-      }
+    btnReset.addEventListener('click', () => {
+      showConfirmDialog({
+        title: t('confirm_title'),
+        message: t('confirm_reset_settings'),
+        onConfirm: async () => {
+          await invoke('reset_settings');
+          applyLanguage('vi');
+          updateThemeUI('dark');
+          showToast(t('toast_defaults_restored'));
+          closeSettingsModal();
+          await loadClips();
+        }
+      });
     });
   }
 
@@ -1250,10 +1528,17 @@ function setupSettingsModal() {
 function setupKeyboardNavigation() {
   window.addEventListener('keydown', async (e) => {
     // If modal is open, let user type inside inputs
-    if (!DOM.modalNote.classList.contains('hidden') || !DOM.modalSettings.classList.contains('hidden')) {
+    const isModalOpen = !DOM.modalNote.classList.contains('hidden') 
+      || !DOM.modalSettings.classList.contains('hidden')
+      || !document.getElementById('modal-pin')?.classList.contains('hidden')
+      || !document.getElementById('modal-confirm')?.classList.contains('hidden');
+
+    if (isModalOpen) {
       if (e.key === 'Escape') {
         closeNoteModal();
         closeSettingsModal();
+        closePinDialog(true);
+        document.getElementById('modal-confirm')?.classList.add('hidden');
       }
       return;
     }
@@ -1348,12 +1633,16 @@ function setupHeaderActions() {
     await invoke('hide_window');
   });
 
-  DOM.btnClear.addEventListener('click', async () => {
-    if (confirm(t('confirm_clear_unpinned'))) {
-      const removed = await invoke('clear_unpinned');
-      showToast(t('toast_cleaned', { count: removed }));
-      await loadClips();
-    }
+  DOM.btnClear.addEventListener('click', () => {
+    showConfirmDialog({
+      title: t('confirm_title'),
+      message: t('confirm_clear_unpinned'),
+      onConfirm: async () => {
+        const removed = await invoke('clear_unpinned');
+        showToast(t('toast_cleaned', { count: removed }));
+        await loadClips();
+      }
+    });
   });
 
   // Dark / Light Theme
@@ -1466,6 +1755,7 @@ async function init() {
   setupModeSwitcher();
   setupSearchAndFilters();
   setupPinKeypad();
+  setupPinDialog();
   setupNoteModal();
   setupSettingsModal();
   setupKeyboardNavigation();
