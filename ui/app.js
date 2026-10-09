@@ -4,17 +4,33 @@
  */
 
 // ── IPC Abstraction Layer ──────────────────────────────────────────
-const isTauri = typeof window.__TAURI__ !== 'undefined' && typeof window.__TAURI__.core !== 'undefined';
+function getTauri() {
+  return typeof window.__TAURI__ !== 'undefined' ? window.__TAURI__ : null;
+}
+
+function getTauriInvoke() {
+  const tauri = getTauri();
+  if (!tauri) return null;
+  if (tauri.core && typeof tauri.core.invoke === 'function') {
+    return tauri.core.invoke;
+  }
+  if (typeof tauri.invoke === 'function') {
+    return tauri.invoke;
+  }
+  return null;
+}
 
 async function invoke(command, args = {}) {
-  if (isTauri) {
+  const tauriInvoke = getTauriInvoke();
+  if (tauriInvoke) {
     try {
-      return await window.__TAURI__.core.invoke(command, args);
+      return await tauriInvoke(command, args);
     } catch (err) {
       console.error(`[IPC Error] ${command}:`, err);
       throw err;
     }
   } else {
+    console.warn(`[Fallback] Tauri core not detected for command: ${command}`);
     return mockInvoke(command, args);
   }
 }
@@ -139,6 +155,7 @@ const state = {
 
 // ── DOM References ─────────────────────────────────────────────────
 const DOM = {
+  statusIndicator: document.getElementById('status-indicator'),
   tabHistory: document.getElementById('tab-history'),
   tabNotes: document.getElementById('tab-notes'),
   historyFilters: document.getElementById('history-filters'),
@@ -301,7 +318,7 @@ function renderHistoryCards(items) {
 
     if (index === 0) state.selectedIndex = 0;
 
-    let typeBadgeLabel = item.type.toUpperCase();
+    let typeBadgeLabel = (item.type || "text").toUpperCase();
     let previewHtml = '';
 
     if (item.type === 'color') {
@@ -908,8 +925,10 @@ function setupHeaderActions() {
 
 // ── Listen for System Clipboard Events ─────────────────────────────
 function setupClipboardListener() {
-  if (isTauri && window.__TAURI__.event) {
-    window.__TAURI__.event.listen('clipboard_changed', (event) => {
+  const tauri = getTauri();
+  if (tauri && tauri.event && typeof tauri.event.listen === 'function') {
+    tauri.event.listen('clipboard_changed', (event) => {
+      console.log("[Clipboard Event] New clip detected:", event);
       if (state.mode === 'history') {
         loadClips();
       }
@@ -929,6 +948,18 @@ function escapeHtml(str) {
 
 // ── Initialization ─────────────────────────────────────────────────
 async function init() {
+  console.log("[ClipMaster] Initializing...");
+  const hasTauri = !!getTauriInvoke();
+  if (DOM.statusIndicator) {
+    if (hasTauri) {
+      DOM.statusIndicator.classList.add('active');
+      DOM.statusIndicator.title = "Đã kết nối Rust Tauri backend (Native)";
+    } else {
+      DOM.statusIndicator.classList.remove('active');
+      DOM.statusIndicator.title = "Chế độ Standalone Browser (Không có backend)";
+    }
+  }
+
   setupModeSwitcher();
   setupSearchAndFilters();
   setupPinKeypad();
@@ -939,9 +970,13 @@ async function init() {
   setupClipboardListener();
 
   // Load saved theme
-  const savedTheme = await invoke('get_setting', { key: 'theme_mode', default_val: 'dark' });
-  document.documentElement.setAttribute('data-theme', savedTheme || 'dark');
-  DOM.btnTheme.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  try {
+    const savedTheme = await invoke('get_setting', { key: 'theme_mode', default_val: 'dark' });
+    document.documentElement.setAttribute('data-theme', savedTheme || 'dark');
+    DOM.btnTheme.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  } catch (e) {
+    console.error("Theme load error:", e);
+  }
 
   // Initial load
   await loadClips();

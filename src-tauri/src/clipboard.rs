@@ -111,19 +111,26 @@ impl ClipboardManager {
         let last_hash_clone = Arc::clone(&self.last_hash);
 
         thread::spawn(move || {
-            let mut clip = match Clipboard::new() {
-                Ok(c) => c,
-                Err(err) => {
-                    log::error!("Failed to initialize clipboard listener: {}", err);
-                    return;
-                }
-            };
+            let mut clip_res = Clipboard::new();
+            if let Err(ref e) = clip_res {
+                eprintln!("[ClipMaster] Cảnh báo khởi tạo clipboard: {}", e);
+            }
 
             loop {
-                thread::sleep(Duration::from_millis(450));
+                thread::sleep(Duration::from_millis(400));
 
-                // Check text
-                if let Ok(text) = clip.get_text() {
+                let text_res = match &mut clip_res {
+                    Ok(clip) => clip.get_text(),
+                    Err(_) => {
+                        clip_res = Clipboard::new();
+                        match &mut clip_res {
+                            Ok(clip) => clip.get_text(),
+                            Err(_) => continue,
+                        }
+                    }
+                };
+
+                if let Ok(text) = text_res {
                     let clean = text.trim();
                     if !clean.is_empty() {
                         let hash = compute_sha256(text.as_bytes());
@@ -135,7 +142,7 @@ impl ClipboardManager {
 
                             let c_type = detect_content_type(&text);
                             if let Ok(Some(saved)) = db.add_clip(c_type, Some(&text), None, 0, 0, &hash) {
-                                // Emit event to frontend
+                                println!("[ClipMaster] 📋 Đã lưu clip mới: {} ký tự (loại: {})", text.len(), c_type);
                                 app_handle.emit("clipboard_changed", &saved).ok();
                             }
                         }
