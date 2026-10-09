@@ -609,7 +609,10 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self.db.add_note(title=title, content=content)
             self.show_toast(t("toast_note_saved", self.lang))
-        self.reload_history()
+        if self.current_mode != "notes":
+            self.set_mode("notes")
+        else:
+            self.reload_history()
 
     def _select_note(self, note: Dict[str, Any]):
         """Copy note content into clipboard and simulate paste."""

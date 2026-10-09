@@ -112,14 +112,23 @@ def format_relative_time(timestamp: float, lang: str = "vi") -> str:
         return f"{t_struct.tm_mday:02d}/{t_struct.tm_mon:02d}/{t_struct.tm_year}"
 
 
-def truncate_text(text: str, max_chars: int = 160) -> str:
-    """Truncate text for single-line or preview display."""
+def truncate_text(text: str, max_chars: int = 160, max_lines: int = 1) -> str:
+    """Truncate text for single-line or multi-line preview display."""
     if not text:
         return ""
     lines = text.strip().splitlines()
-    first_line = lines[0] if lines else ""
-    if len(lines) > 1:
-        first_line += f" ... (+{len(lines)-1} dòng)"
-    if len(first_line) > max_chars:
-        return first_line[:max_chars].rstrip() + "..."
-    return first_line
+    if max_lines <= 1:
+        first_line = lines[0] if lines else ""
+        if len(lines) > 1:
+            first_line += f" ... (+{len(lines)-1} dòng)"
+        if len(first_line) > max_chars:
+            return first_line[:max_chars].rstrip() + "..."
+        return first_line
+    else:
+        selected_lines = lines[:max_lines]
+        result = "\n".join(selected_lines)
+        if len(lines) > max_lines:
+            result += f"\n... (+{len(lines)-max_lines} dòng)"
+        if len(result) > max_chars:
+            return result[:max_chars].rstrip() + "..."
+        return result
