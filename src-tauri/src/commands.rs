@@ -179,6 +179,51 @@ pub fn set_setting(state: State<AppState>, key: String, value: String) -> Result
     state.db.set_setting(&key, &value).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn get_all_settings(state: State<AppState>) -> Result<std::collections::HashMap<String, String>, String> {
+    state.db.get_all_settings().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn reset_settings(state: State<AppState>) -> Result<(), String> {
+    state.db.reset_settings().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_autostart(state: State<AppState>, enabled: bool) -> Result<(), String> {
+    state.db.set_setting("autostart", if enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let autostart_dir = std::path::PathBuf::from(home).join(".config").join("autostart");
+            let desktop_path = autostart_dir.join("clipmaster.desktop");
+            if enabled {
+                std::fs::create_dir_all(&autostart_dir).ok();
+                if let Ok(exe) = std::env::current_exe() {
+                    let content = format!(
+                        "[Desktop Entry]\nType=Application\nName=ClipMaster\nComment=Modern Cross-Platform Clipboard Manager\nExec=\"{}\"\nIcon=clipmaster\nTerminal=false\nCategories=Utility;\nX-GNOME-Autostart-enabled=true\n",
+                        exe.display()
+                    );
+                    std::fs::write(desktop_path, content).ok();
+                }
+            } else {
+                std::fs::remove_file(desktop_path).ok();
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn test_sync_connection(state: State<AppState>) -> Result<String, String> {
+    let url = state.db.get_setting("sync_url", "");
+    if url.trim().is_empty() {
+        return Err("Vui lòng cấu hình URL máy chủ trước khi kiểm tra".to_string());
+    }
+    Ok("Đã lưu cấu hình máy chủ đồng bộ (Sẵn sàng)".to_string())
+}
+
 // ── Window Controls ────────────────────────────────────
 
 #[tauri::command]

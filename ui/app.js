@@ -128,6 +128,16 @@ async function mockInvoke(cmd, args) {
     case 'set_setting':
       mockStore.settings[args.key] = args.value;
       return;
+    case 'get_all_settings':
+      return { ...mockStore.settings };
+    case 'reset_settings':
+      mockStore.settings = { max_history: "200", auto_paste: "1", theme_mode: "dark", notes_pin_enabled: "0", language: "vi" };
+      return;
+    case 'set_autostart':
+      mockStore.settings.autostart = args.enabled ? "1" : "0";
+      return;
+    case 'test_sync_connection':
+      return "Đã kết nối máy chủ đồng bộ thử nghiệm thành công!";
     case 'hide_window':
     case 'close_window':
       console.log(`[Window Action] ${cmd}`);
@@ -752,18 +762,75 @@ function setupNoteModal() {
   });
 }
 
-// ── Settings Modal ─────────────────────────────────────────────────
+// ── Settings Modal (Multi-Tab Preferences) ─────────────────────────
 async function openSettingsModal() {
   DOM.modalSettings.classList.remove('hidden');
 
-  const maxHistory = await invoke('get_setting', { key: 'max_history', default_val: '200' });
-  const autoPaste = await invoke('get_setting', { key: 'auto_paste', default_val: '1' });
-  const pinEnabled = await invoke('is_notes_pin_enabled');
+  let settings = {};
+  try {
+    settings = await invoke('get_all_settings') || {};
+  } catch (err) {
+    console.error("Failed to fetch all settings:", err);
+  }
 
-  DOM.settingMaxHistory.value = maxHistory || '200';
-  DOM.settingAutoPaste.checked = autoPaste === '1';
-  DOM.settingPinStatus.textContent = pinEnabled ? "Trạng thái: ĐÃ BẬT bảo vệ PIN" : "Trạng thái: Chưa bật";
-  DOM.settingPinStatus.style.color = pinEnabled ? "var(--success-color)" : "var(--text-muted)";
+  // General tab
+  const themeMode = settings.theme_mode || 'dark';
+  const language = settings.language || 'vi';
+  const autostart = settings.autostart === '1';
+
+  const elTheme = document.getElementById('setting-theme-mode');
+  const elLang = document.getElementById('setting-language');
+  const elAutostart = document.getElementById('setting-autostart');
+  if (elTheme) elTheme.value = themeMode;
+  if (elLang) elLang.value = language;
+  if (elAutostart) elAutostart.checked = autostart;
+
+  // Storage tab
+  const autoRecord = settings.auto_record !== '0';
+  const autoPaste = settings.auto_paste !== '0';
+  const saveImages = settings.save_images !== '0';
+  const maxHistory = settings.max_history || '200';
+
+  const elAutoRecord = document.getElementById('setting-auto-record');
+  const elAutoPaste = document.getElementById('setting-auto-paste');
+  const elSaveImages = document.getElementById('setting-save-images');
+  const elMaxHistory = document.getElementById('setting-max-history');
+  if (elAutoRecord) elAutoRecord.checked = autoRecord;
+  if (elAutoPaste) elAutoPaste.checked = autoPaste;
+  if (elSaveImages) elSaveImages.checked = saveImages;
+  if (elMaxHistory) elMaxHistory.value = maxHistory;
+
+  // Shortcut tab
+  const shortcut = settings.shortcut || '<Super>v';
+  const elShortcut = document.getElementById('setting-shortcut-preset');
+  if (elShortcut) elShortcut.value = shortcut;
+
+  // Security tab
+  const pinEnabled = await invoke('is_notes_pin_enabled');
+  const pinTimeout = settings.notes_pin_timeout || '300';
+  const elPinToggle = document.getElementById('setting-pin-toggle');
+  const elPinTimeout = document.getElementById('setting-pin-timeout');
+  const elPinStatus = document.getElementById('setting-pin-status');
+  if (elPinToggle) elPinToggle.checked = pinEnabled;
+  if (elPinTimeout) elPinTimeout.value = pinTimeout;
+  if (elPinStatus) {
+    elPinStatus.textContent = pinEnabled ? "Trạng thái: ĐÃ BẬT bảo vệ PIN" : "Trạng thái: Chưa bật";
+    elPinStatus.style.color = pinEnabled ? "var(--success-color)" : "var(--text-muted)";
+  }
+
+  // Sync tab
+  const syncToggle = settings.sync_enabled === '1';
+  const syncUrl = settings.sync_url || '';
+  const syncToken = settings.sync_token || '';
+  const syncDirection = settings.sync_direction || 'bidirectional';
+  const elSyncToggle = document.getElementById('setting-sync-toggle');
+  const elSyncUrl = document.getElementById('setting-sync-url');
+  const elSyncToken = document.getElementById('setting-sync-token');
+  const elSyncDirection = document.getElementById('setting-sync-direction');
+  if (elSyncToggle) elSyncToggle.checked = syncToggle;
+  if (elSyncUrl) elSyncUrl.value = syncUrl;
+  if (elSyncToken) elSyncToken.value = syncToken;
+  if (elSyncDirection) elSyncDirection.value = syncDirection;
 }
 
 function closeSettingsModal() {
@@ -774,32 +841,150 @@ function setupSettingsModal() {
   DOM.btnSettings.addEventListener('click', openSettingsModal);
   DOM.btnCloseSettingsModal.addEventListener('click', closeSettingsModal);
 
-  DOM.btnSetPin.addEventListener('click', async () => {
-    const pin = DOM.settingNewPin.value.trim();
-    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-      alert("Mã PIN phải gồm đúng 4 chữ số (0-9)!");
-      return;
-    }
-    await invoke('set_notes_pin', { pin });
-    DOM.settingNewPin.value = '';
-    DOM.settingPinStatus.textContent = "Trạng thái: ĐÃ BẬT bảo vệ PIN";
-    DOM.settingPinStatus.style.color = "var(--success-color)";
-    showToast("Đã cập nhật mã PIN bảo mật!");
-  });
+  // Tab navigation
+  const navTabs = document.getElementById('settings-nav-tabs');
+  if (navTabs) {
+    navTabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('.settings-nav-btn');
+      if (!btn) return;
+      navTabs.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
 
-  DOM.btnDisablePin.addEventListener('click', async () => {
-    await invoke('disable_notes_pin');
-    DOM.settingPinStatus.textContent = "Trạng thái: Đã tắt mã PIN";
-    DOM.settingPinStatus.style.color = "var(--text-muted)";
-    state.notesUnlocked = true;
-    showToast("Đã tắt bảo vệ bằng mã PIN!");
-  });
+      const tabId = btn.dataset.tab;
+      document.querySelectorAll('[id^="tab-pane-"]').forEach(pane => pane.classList.add('hidden'));
+      const activePane = document.getElementById(`tab-pane-${tabId}`);
+      if (activePane) activePane.classList.remove('hidden');
+    });
+  }
 
+  // Theme switch inside settings immediately reflects
+  const elTheme = document.getElementById('setting-theme-mode');
+  if (elTheme) {
+    elTheme.addEventListener('change', async () => {
+      const val = elTheme.value;
+      document.documentElement.setAttribute('data-theme', val);
+      DOM.btnTheme.textContent = val === 'dark' ? '🌙' : '☀️';
+      await invoke('set_setting', { key: 'theme_mode', value: val });
+    });
+  }
+
+  // PIN Save
+  const btnSetPin = document.getElementById('btn-set-pin');
+  const elNewPin = document.getElementById('setting-new-pin');
+  if (btnSetPin && elNewPin) {
+    btnSetPin.addEventListener('click', async () => {
+      const pin = elNewPin.value.trim();
+      if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+        alert("Mã PIN phải gồm đúng 4 chữ số (0-9)!");
+        return;
+      }
+      await invoke('set_notes_pin', { pin });
+      elNewPin.value = '';
+      const elPinStatus = document.getElementById('setting-pin-status');
+      const elPinToggle = document.getElementById('setting-pin-toggle');
+      if (elPinStatus) {
+        elPinStatus.textContent = "Trạng thái: ĐÃ BẬT bảo vệ PIN";
+        elPinStatus.style.color = "var(--success-color)";
+      }
+      if (elPinToggle) elPinToggle.checked = true;
+      showToast("Đã lưu mã PIN bảo mật!");
+    });
+  }
+
+  // PIN Toggle switch
+  const elPinToggle = document.getElementById('setting-pin-toggle');
+  if (elPinToggle) {
+    elPinToggle.addEventListener('change', async () => {
+      const elPinStatus = document.getElementById('setting-pin-status');
+      if (!elPinToggle.checked) {
+        await invoke('disable_notes_pin');
+        state.notesUnlocked = true;
+        if (elPinStatus) {
+          elPinStatus.textContent = "Trạng thái: Chưa bật";
+          elPinStatus.style.color = "var(--text-muted)";
+        }
+        showToast("Đã tắt bảo vệ bằng mã PIN!");
+      } else {
+        alert("Vui lòng nhập 4 chữ số vào ô bên dưới và nhấn 'Lưu mã PIN' để kích hoạt.");
+        elPinToggle.checked = false;
+        const elPinInput = document.getElementById('setting-new-pin');
+        if (elPinInput) elPinInput.focus();
+      }
+    });
+  }
+
+  // Test Sync
+  const btnTestSync = document.getElementById('btn-test-sync');
+  if (btnTestSync) {
+    btnTestSync.addEventListener('click', async () => {
+      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
+      await invoke('set_setting', { key: 'sync_url', value: syncUrl });
+      try {
+        const msg = await invoke('test_sync_connection');
+        showToast(msg);
+      } catch (err) {
+        alert("Lỗi kết nối máy chủ đồng bộ: " + err);
+      }
+    });
+  }
+
+  // Maintenance: Clear unpinned
+  const btnSettingsClear = document.getElementById('btn-settings-clear-unpinned');
+  if (btnSettingsClear) {
+    btnSettingsClear.addEventListener('click', async () => {
+      if (confirm("Bạn có chắc chắn muốn xóa tất cả lịch sử chưa ghim?")) {
+        const removed = await invoke('clear_unpinned');
+        showToast(`Đã dọn dẹp ${removed} mục.`);
+        await loadClips();
+      }
+    });
+  }
+
+  // Maintenance: Reset defaults
+  const btnReset = document.getElementById('btn-reset-defaults');
+  if (btnReset) {
+    btnReset.addEventListener('click', async () => {
+      if (confirm("Khôi phục toàn bộ cài đặt về trạng thái ban đầu?")) {
+        await invoke('reset_settings');
+        showToast("Đã khôi phục cài đặt gốc!");
+        closeSettingsModal();
+        await loadClips();
+      }
+    });
+  }
+
+  // Save & Close Settings
   DOM.btnSaveSettings.addEventListener('click', async () => {
-    await invoke('set_setting', { key: 'max_history', value: DOM.settingMaxHistory.value });
-    await invoke('set_setting', { key: 'auto_paste', value: DOM.settingAutoPaste.checked ? '1' : '0' });
+    const elTheme = document.getElementById('setting-theme-mode');
+    const elLang = document.getElementById('setting-language');
+    const elAutostart = document.getElementById('setting-autostart');
+    const elAutoRecord = document.getElementById('setting-auto-record');
+    const elAutoPaste = document.getElementById('setting-auto-paste');
+    const elSaveImages = document.getElementById('setting-save-images');
+    const elMaxHistory = document.getElementById('setting-max-history');
+    const elShortcut = document.getElementById('setting-shortcut-preset');
+    const elPinTimeout = document.getElementById('setting-pin-timeout');
+    const elSyncToggle = document.getElementById('setting-sync-toggle');
+    const elSyncUrl = document.getElementById('setting-sync-url');
+    const elSyncToken = document.getElementById('setting-sync-token');
+    const elSyncDirection = document.getElementById('setting-sync-direction');
+
+    if (elTheme) await invoke('set_setting', { key: 'theme_mode', value: elTheme.value });
+    if (elLang) await invoke('set_setting', { key: 'language', value: elLang.value });
+    if (elAutostart) await invoke('set_autostart', { enabled: elAutostart.checked });
+    if (elAutoRecord) await invoke('set_setting', { key: 'auto_record', value: elAutoRecord.checked ? '1' : '0' });
+    if (elAutoPaste) await invoke('set_setting', { key: 'auto_paste', value: elAutoPaste.checked ? '1' : '0' });
+    if (elSaveImages) await invoke('set_setting', { key: 'save_images', value: elSaveImages.checked ? '1' : '0' });
+    if (elMaxHistory) await invoke('set_setting', { key: 'max_history', value: elMaxHistory.value });
+    if (elShortcut) await invoke('set_setting', { key: 'shortcut', value: elShortcut.value });
+    if (elPinTimeout) await invoke('set_setting', { key: 'notes_pin_timeout', value: elPinTimeout.value });
+    if (elSyncToggle) await invoke('set_setting', { key: 'sync_enabled', value: elSyncToggle.checked ? '1' : '0' });
+    if (elSyncUrl) await invoke('set_setting', { key: 'sync_url', value: elSyncUrl.value.trim() });
+    if (elSyncToken) await invoke('set_setting', { key: 'sync_token', value: elSyncToken.value.trim() });
+    if (elSyncDirection) await invoke('set_setting', { key: 'sync_direction', value: elSyncDirection.value });
+
     closeSettingsModal();
-    showToast("Đã lưu thiết lập!");
+    showToast("Đã lưu toàn bộ cài đặt!");
   });
 }
 

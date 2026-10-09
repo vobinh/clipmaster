@@ -43,6 +43,10 @@ pub fn run() {
             disable_notes_pin,
             get_setting,
             set_setting,
+            get_all_settings,
+            reset_settings,
+            set_autostart,
+            test_sync_connection,
             hide_window,
             close_window,
         ])

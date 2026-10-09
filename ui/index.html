@@ -155,35 +155,254 @@
       </div>
     </div>
 
-    <!-- Modal Settings -->
+    <!-- Modal Settings (Multi-Tab Preferences Window) -->
     <div class="modal-overlay hidden" id="modal-settings">
-      <div class="modal-card">
+      <div class="modal-card settings-modal-card">
+        <!-- Header -->
         <div class="modal-header">
           <h3 class="modal-title">⚙️ Cài đặt ClipMaster</h3>
           <button class="icon-btn close-btn" id="btn-close-settings-modal">✕</button>
         </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label">Số lượng mục lịch sử tối đa</label>
-            <input type="number" class="form-input" id="setting-max-history" min="50" max="1000" value="200" />
-          </div>
-          <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
-            <label class="form-label">Tự động dán khi chọn (Auto Paste)</label>
-            <input type="checkbox" id="setting-auto-paste" checked />
-          </div>
-          <hr style="border: none; border-top: 1px solid var(--card-border);" />
-          <div class="form-group">
-            <label class="form-label">Bảo mật PIN Ghi chú (4 chữ số)</label>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="password" class="form-input" id="setting-new-pin" maxlength="4" placeholder="Mã PIN mới (4 số)" style="flex: 1;" />
-              <button class="btn-primary" id="btn-set-pin" style="padding: 6px 10px;">Đặt PIN</button>
-              <button class="btn-secondary" id="btn-disable-pin" style="padding: 6px 10px;">Tắt PIN</button>
+
+        <!-- Navigation Tabs -->
+        <div class="settings-nav-tabs" id="settings-nav-tabs">
+          <button class="settings-nav-btn active" data-tab="general">🎨 Chung</button>
+          <button class="settings-nav-btn" data-tab="storage">📋 Bộ nhớ</button>
+          <button class="settings-nav-btn" data-tab="shortcut">⌨️ Phím tắt</button>
+          <button class="settings-nav-btn" data-tab="security">🔒 Bảo mật PIN</button>
+          <button class="settings-nav-btn" data-tab="sync">☁️ Đồng bộ</button>
+          <button class="settings-nav-btn" data-tab="maintenance">⚠️ Dọn dẹp</button>
+          <button class="settings-nav-btn" data-tab="about">ℹ️ Thông tin</button>
+        </div>
+
+        <!-- Tab 1: Chung (General) -->
+        <div class="settings-content-body" id="tab-pane-general">
+          <div class="settings-section-title">Giao diện & Trải nghiệm</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Chế độ giao diện</span>
+              <span class="settings-row-desc">Giao diện màu tối, sáng hoặc theo hệ thống</span>
             </div>
-            <span style="font-size: 11px; color: var(--text-muted);" id="setting-pin-status">Trạng thái: Chưa bật</span>
+            <select class="settings-select" id="setting-theme-mode">
+              <option value="dark">🌙 Tối (Dark)</option>
+              <option value="light">☀️ Sáng (Light)</option>
+            </select>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Ngôn ngữ hiển thị</span>
+              <span class="settings-row-desc">Ngôn ngữ giao diện ứng dụng</span>
+            </div>
+            <select class="settings-select" id="setting-language">
+              <option value="vi">🇻🇳 Tiếng Việt</option>
+              <option value="en">🇬🇧 English</option>
+            </select>
+          </div>
+
+          <div class="settings-section-title">Hệ thống</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Khởi động cùng hệ thống</span>
+              <span class="settings-row-desc">Tự động chạy ClipMaster khi bật máy tính</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-autostart" />
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
+
+        <!-- Tab 2: Bộ nhớ (Storage & Behavior) -->
+        <div class="settings-content-body hidden" id="tab-pane-storage">
+          <div class="settings-section-title">Hành vi Clipboard</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Tự động ghi nhớ (Auto Record)</span>
+              <span class="settings-row-desc">Tự động lưu nội dung mới khi bạn nhấn Ctrl+C</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-record" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Tự động dán (Auto Paste)</span>
+              <span class="settings-row-desc">Tự động dán và ẩn cửa sổ khi click chọn mục</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-paste" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Lưu hình ảnh (Save Images)</span>
+              <span class="settings-row-desc">Lưu trữ ảnh khi chụp màn hình hoặc copy ảnh</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-save-images" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-section-title">Giới hạn lưu trữ</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Số lượng mục tối đa</span>
+              <span class="settings-row-desc">Số mục chưa ghim tối đa được lưu trữ</span>
+            </div>
+            <select class="settings-select" id="setting-max-history">
+              <option value="50">50 mục</option>
+              <option value="100">100 mục</option>
+              <option value="200">200 mục (Mặc định)</option>
+              <option value="500">500 mục</option>
+              <option value="1000">1000 mục</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tab 3: Phím tắt (Shortcuts) -->
+        <div class="settings-content-body hidden" id="tab-pane-shortcut">
+          <div class="settings-section-title">Phím tắt toàn hệ thống</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Phím tắt mở ClipMaster</span>
+              <span class="settings-row-desc">Nhấn tổ hợp phím này ở bất cứ đâu để mở ứng dụng</span>
+            </div>
+            <select class="settings-select" id="setting-shortcut-preset">
+              <option value="<Super>v">Super + V (Win + V)</option>
+              <option value="<Control><Shift>v">Ctrl + Shift + V</option>
+              <option value="<Alt>v">Alt + V</option>
+              <option value="<Control><Alt>v">Ctrl + Alt + V</option>
+            </select>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; padding: 4px;">
+            💡 <em>Gợi ý:</em> Trên Linux & Windows, phím <strong>Super + V (Win + V)</strong> mang lại trải nghiệm mở khay clipboard trực quan và tiện lợi nhất.
+          </div>
+        </div>
+
+        <!-- Tab 4: Bảo mật PIN (PIN Security) -->
+        <div class="settings-content-body hidden" id="tab-pane-security">
+          <div class="settings-section-title">Bảo vệ mục Ghi chú</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Khóa Ghi chú bằng mã PIN</span>
+              <span class="settings-row-desc" id="setting-pin-status">Trạng thái: Chưa bật</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-pin-toggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-section-title">Thiết lập mã PIN</div>
+          <div class="settings-row" style="flex-direction: column; align-items: stretch;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="password" class="form-input" id="setting-new-pin" maxlength="4" placeholder="Nhập mã PIN mới (4 số)" style="flex: 1;" />
+              <button class="btn-primary" id="btn-set-pin" style="padding: 7px 12px;">Lưu mã PIN</button>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Mã PIN gồm đúng 4 chữ số (0-9) dùng để bảo vệ quyền riêng tư các ghi chú.</span>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Tự động khóa lại sau</span>
+              <span class="settings-row-desc">Thời gian không hoạt động trước khi khóa lại</span>
+            </div>
+            <select class="settings-select" id="setting-pin-timeout">
+              <option value="60">1 phút</option>
+              <option value="300">5 phút (Mặc định)</option>
+              <option value="900">15 phút</option>
+              <option value="1800">30 phút</option>
+              <option value="0">Ngay khi đóng cửa sổ</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tab 5: Đồng bộ (Cloud Sync) -->
+        <div class="settings-content-body hidden" id="tab-pane-sync">
+          <div class="settings-section-title">Đồng bộ đám mây (BYOS)</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Bật đồng bộ đám mây</span>
+              <span class="settings-row-desc">Đồng bộ các mục ghim và ghi chú giữa các thiết bị</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-sync-toggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">URL Máy chủ (Sync Server URL)</label>
+            <input type="text" class="form-input" id="setting-sync-url" placeholder="https://sync.clipmaster.io hoặc IP cá nhân" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Mã xác thực (API Token / Key)</label>
+            <input type="password" class="form-input" id="setting-sync-token" placeholder="Nhập API token bí mật" />
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Hướng đồng bộ</span>
+              <span class="settings-row-desc">Quy tắc tải dữ liệu</span>
+            </div>
+            <select class="settings-select" id="setting-sync-direction">
+              <option value="bidirectional">Hai chiều (Tải lên & Tải về)</option>
+              <option value="push_only">Chỉ tải lên máy chủ</option>
+              <option value="pull_only">Chỉ tải về từ máy chủ</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
+            <button class="btn-secondary" id="btn-test-sync">Kiểm tra kết nối</button>
+          </div>
+        </div>
+
+        <!-- Tab 6: Dọn dẹp (Danger & Maintenance) -->
+        <div class="settings-content-body hidden" id="tab-pane-maintenance">
+          <div class="settings-section-title">Dọn dẹp dữ liệu</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Xóa lịch sử chưa ghim</span>
+              <span class="settings-row-desc">Giữ lại các mục quan trọng đã ghim (📌)</span>
+            </div>
+            <button class="btn-secondary" id="btn-settings-clear-unpinned" style="color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3);">Xóa ngay</button>
+          </div>
+
+          <div class="settings-section-title">Khôi phục mặc định</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-title">Đặt lại toàn bộ cài đặt</span>
+              <span class="settings-row-desc">Khôi phục tất cả thiết lập về trạng thái ban đầu</span>
+            </div>
+            <button class="btn-secondary" id="btn-reset-defaults" style="color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3);">Khôi phục</button>
+          </div>
+        </div>
+
+        <!-- Tab 7: Thông tin (About) -->
+        <div class="settings-content-body hidden" id="tab-pane-about">
+          <div style="text-align: center; padding: 20px 0;">
+            <div style="font-size: 42px; margin-bottom: 8px;">📋</div>
+            <h2 style="font-size: 16px; font-weight: 700;">ClipMaster</h2>
+            <div style="font-size: 12px; color: var(--accent-color); font-weight: 600; margin-top: 2px;">Phiên bản 2.0.0 (Native Rust Edition)</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.6; max-width: 340px; margin-left: auto; margin-right: auto;">
+              Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust 🦀 và Tauri v2 ⚡. Hỗ trợ Linux, Windows và macOS.
+            </p>
+            <div style="margin-top: 16px; font-size: 11px; color: var(--text-muted);">
+              Giữ bản quyền © 2026 ClipMaster Open Source.
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
         <div class="modal-footer">
-          <button class="btn-primary" id="btn-save-settings">Hoàn tất</button>
+          <button class="btn-primary" id="btn-save-settings">Đóng & Lưu</button>
         </div>
       </div>
     </div>

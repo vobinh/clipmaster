@@ -467,6 +467,29 @@ impl Database {
         Ok(())
     }
 
+    pub fn get_all_settings(&self) -> Result<std::collections::HashMap<String, String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut map = std::collections::HashMap::new();
+        for r in rows.flatten() {
+            map.insert(r.0, r.1);
+        }
+        Ok(map)
+    }
+
+    pub fn reset_settings(&self) -> Result<()> {
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute("DELETE FROM settings", [])?;
+        }
+        self.init_schema()?;
+        Ok(())
+    }
+
     // ── Notes ──────────────────────────────────────────
     pub fn add_note(
         &self,
