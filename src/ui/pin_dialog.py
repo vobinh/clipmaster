@@ -89,6 +89,7 @@ class SetPinDialog(Adw.Window):
 
             self.curr_entry = Gtk.PasswordEntry()
             self.curr_entry.set_show_peek_icon(True)
+            self.curr_entry.set_alignment(0.5)
             self._restrict_4_digits(self.curr_entry)
             self.curr_entry.connect("activate", lambda _: self.new_entry.grab_focus())
             cur_box.append(self.curr_entry)
@@ -105,6 +106,7 @@ class SetPinDialog(Adw.Window):
 
         self.new_entry = Gtk.PasswordEntry()
         self.new_entry.set_show_peek_icon(True)
+        self.new_entry.set_alignment(0.5)
         self._restrict_4_digits(self.new_entry)
         self.new_entry.connect("activate", lambda _: self.conf_entry.grab_focus())
         new_box.append(self.new_entry)
@@ -119,6 +121,7 @@ class SetPinDialog(Adw.Window):
 
         self.conf_entry = Gtk.PasswordEntry()
         self.conf_entry.set_show_peek_icon(True)
+        self.conf_entry.set_alignment(0.5)
         self._restrict_4_digits(self.conf_entry)
         self.conf_entry.connect("activate", lambda _: self._on_save_clicked(None))
         conf_box.append(self.conf_entry)
@@ -138,6 +141,7 @@ class SetPinDialog(Adw.Window):
             clean = "".join(ch for ch in txt if ch.isdigit())[:4]
             if txt != clean:
                 _e.set_text(clean)
+                _e.set_position(-1)
         entry.connect("changed", _on_changed)
 
     def _show_error(self, msg: str):

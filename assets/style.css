@@ -384,47 +384,115 @@ window.clipmaster-window {
 
 /* ── PIN Lock Screen & Dialog ── */
 .pin-lock-box {
-    padding: 36px 24px;
+    padding: 20px 24px;
 }
 
 .pin-header-icon {
     color: #f59e0b;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 .pin-lock-title {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
     color: @window_fg_color;
 }
 
 .pin-lock-subtitle {
-    font-size: 13px;
+    font-size: 12.5px;
     color: alpha(@window_fg_color, 0.65);
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
-.pin-lock-entry {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: 8px;
-    border-radius: 12px;
-    min-width: 160px;
-    padding: 8px 16px;
-    margin-top: 8px;
-    border: 1.5px solid alpha(@window_fg_color, 0.2);
+/* 4-dot PIN indicators */
+.pin-dots-container {
+    margin: 10px 0 6px 0;
 }
 
-.pin-lock-entry:focus-within {
+.pin-dot {
+    min-width: 14px;
+    min-height: 14px;
+    border-radius: 7px;
+    background-color: transparent;
+    border: 2px solid alpha(@window_fg_color, 0.25);
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pin-dot.filled {
+    background-color: #f59e0b;
     border-color: #f59e0b;
-    box-shadow: 0 0 0 3px alpha(#f59e0b, 0.25);
+    box-shadow: 0 0 10px alpha(#f59e0b, 0.6);
+    transform: scale(1.2);
+}
+
+.pin-dot.error {
+    background-color: #ef4444;
+    border-color: #ef4444;
+    box-shadow: 0 0 10px alpha(#ef4444, 0.6);
+}
+
+/* Numeric Keypad */
+.pin-keypad-box {
+    margin-top: 6px;
+}
+
+.pin-key-btn {
+    min-width: 62px;
+    min-height: 44px;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 700;
+    background-color: alpha(@window_fg_color, 0.06);
+    border: 1px solid alpha(@window_fg_color, 0.08);
+    color: @window_fg_color;
+    transition: all 120ms ease;
+}
+
+.pin-key-btn:hover {
+    background-color: alpha(@window_fg_color, 0.12);
+    border-color: alpha(@window_fg_color, 0.2);
+    transform: translateY(-1px);
+}
+
+.pin-key-btn:active {
+    background-color: alpha(#f59e0b, 0.25);
+    border-color: #f59e0b;
+    transform: scale(0.95);
+}
+
+.pin-key-btn.action-btn {
+    font-size: 14px;
+    font-weight: 600;
+    color: alpha(@window_fg_color, 0.65);
+}
+
+.pin-key-btn.action-btn:hover {
+    color: @window_fg_color;
 }
 
 .pin-error-lbl {
     color: #ef4444;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     margin-top: 4px;
+    min-height: 18px;
+}
+
+.pin-back-btn {
+    font-size: 12px;
+    font-weight: 600;
+    color: alpha(@window_fg_color, 0.6);
+    border-radius: 8px;
+    padding: 4px 12px;
+    margin-top: 6px;
+    background: transparent;
+    border: none;
+    transition: all 150ms ease;
+}
+
+.pin-back-btn:hover {
+    color: @window_fg_color;
+    background-color: alpha(@window_fg_color, 0.08);
 }
 
 
