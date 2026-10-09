@@ -55,6 +55,21 @@ class Database:
                 value TEXT NOT NULL
             )
             """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                content TEXT NOT NULL,
+                content_hash TEXT UNIQUE NOT NULL,
+                is_pinned INTEGER DEFAULT 0,
+                color TEXT DEFAULT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at DESC)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(is_pinned)")
             
             # Default settings
             defaults = {
@@ -365,3 +380,113 @@ class Database:
                 (content_hash,)
             )
             conn.commit()
+
+    # ── Notes Management (Ghi chú cá nhân) ─────────
+
+    def add_note(
+        self,
+        title: Optional[str],
+        content: str,
+        is_pinned: bool = False,
+        color: Optional[str] = None,
+    ) -> Optional[int]:
+        """Tạo mới một ghi chú cá nhân."""
+        if not content or not content.strip():
+            return None
+        now = time.time()
+        c_hash = hashlib.sha256(f"{now}_{content}".encode("utf-8")).hexdigest()
+        clean_title = title.strip() if title else ""
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """INSERT INTO notes (title, content, content_hash, is_pinned, color, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (clean_title, content.strip(), c_hash, 1 if is_pinned else 0, color, now, now),
+            )
+            note_id = cur.lastrowid
+            conn.commit()
+            return note_id
+
+    def update_note(
+        self,
+        note_id: int,
+        title: Optional[str],
+        content: str,
+        color: Optional[str] = None,
+    ) -> bool:
+        """Cập nhật nội dung/tiêu đề của ghi chú đã có."""
+        if not content or not content.strip():
+            return False
+        now = time.time()
+        clean_title = title.strip() if title else ""
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """UPDATE notes
+                   SET title = ?, content = ?, color = COALESCE(?, color), updated_at = ?
+                   WHERE id = ?""",
+                (clean_title, content.strip(), color, now, note_id),
+            )
+            updated = cur.rowcount > 0
+            conn.commit()
+            return updated
+
+    def delete_note(self, note_id: int) -> bool:
+        """Xóa vĩnh viễn ghi chú theo ID."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+            deleted = cur.rowcount > 0
+            conn.commit()
+            return deleted
+
+    def toggle_pin_note(self, note_id: int) -> bool:
+        """Bật/tắt ghim cho ghi chú."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT is_pinned FROM notes WHERE id = ?", (note_id,))
+            row = cur.fetchone()
+            if not row:
+                return False
+            new_pinned = 0 if row["is_pinned"] else 1
+            cur.execute("UPDATE notes SET is_pinned = ?, updated_at = ? WHERE id = ?", (new_pinned, time.time(), note_id))
+            conn.commit()
+            return bool(new_pinned)
+
+    def get_notes(
+        self,
+        query: str = "",
+        filter_pinned: bool = False,
+        limit: int = 200,
+    ) -> list[dict]:
+        """Lấy danh sách ghi chú với tìm kiếm và sắp xếp."""
+        sql = "SELECT * FROM notes WHERE 1=1"
+        params = []
+
+        if filter_pinned:
+            sql += " AND is_pinned = 1"
+
+        if query and query.strip():
+            sql += " AND (title LIKE ? OR content LIKE ?)"
+            q_like = f"%{query.strip()}%"
+            params.extend([q_like, q_like])
+
+        sql += " ORDER BY is_pinned DESC, updated_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
+    def get_note_by_id(self, note_id: int) -> Optional[dict]:
+        """Lấy chi tiết 1 ghi chú theo ID."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+

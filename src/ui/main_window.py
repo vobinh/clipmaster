@@ -19,6 +19,8 @@ from ..theme_manager import apply_theme_mode, toggle_theme_mode
 from ..sync_manager import SyncManager
 from .history_item_row import HistoryItemRow
 from .settings_dialog import SettingsDialog
+from .note_editor_dialog import NoteEditorDialog
+from .note_item_row import NoteItemRow
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -36,9 +38,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.sync_mgr = sync_mgr
 
         self.lang = self.db.get_setting("language", "vi")
+        self.current_mode = "history"  # "history" or "notes"
         self.current_filter = "all"
+        self.notes_filter = "all"
         self.current_query = ""
         self._filter_buttons = {}
+        self._notes_filter_buttons = {}
 
         # Apply saved theme mode
         apply_theme_mode(self.db.get_setting("theme_mode", "dark"))
@@ -119,12 +124,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.theme_btn.connect("clicked", self._on_toggle_theme)
         header.pack_end(self.theme_btn)
 
-        # Clear Unpinned Button
+        # Clear Unpinned Button (hiển thị khi ở tab Lịch sử)
         self.clear_btn = Gtk.Button()
         self.clear_btn.set_icon_name("user-trash-symbolic")
         self.clear_btn.set_tooltip_text(t("tooltip_clear", self.lang))
         self.clear_btn.connect("clicked", self._confirm_clear_unpinned)
         header.pack_end(self.clear_btn)
+
+        # Create Note Button (hiển thị khi ở tab Ghi chú)
+        self.create_note_btn = Gtk.Button(label=t("btn_create_note", self.lang))
+        self.create_note_btn.set_icon_name("list-add-symbolic")
+        self.create_note_btn.add_css_class("suggested-action")
+        self.create_note_btn.add_css_class("create-note-btn")
+        self.create_note_btn.set_tooltip_text(t("tooltip_create_note", self.lang))
+        self.create_note_btn.connect("clicked", self._on_open_create_note_dialog)
+        self.create_note_btn.set_visible(False)
+        header.pack_end(self.create_note_btn)
 
         main_box.append(header)
 
@@ -148,6 +163,29 @@ class MainWindow(Adw.ApplicationWindow):
 
         main_box.append(self.pause_banner)
 
+        # Mode Switcher (Lịch sử Clipboard / Ghi chú cá nhân)
+        mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        mode_box.add_css_class("mode-switcher-container")
+        mode_box.set_halign(Gtk.Align.CENTER)
+
+        mode_inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        mode_inner.add_css_class("linked")
+        mode_inner.add_css_class("mode-switcher")
+
+        self.mode_history_btn = Gtk.Button(label=t("tab_history", self.lang))
+        self.mode_history_btn.add_css_class("mode-btn")
+        self.mode_history_btn.add_css_class("active")
+        self.mode_history_btn.connect("clicked", lambda _: self.set_mode("history"))
+
+        self.mode_notes_btn = Gtk.Button(label=t("tab_notes", self.lang))
+        self.mode_notes_btn.add_css_class("mode-btn")
+        self.mode_notes_btn.connect("clicked", lambda _: self.set_mode("notes"))
+
+        mode_inner.append(self.mode_history_btn)
+        mode_inner.append(self.mode_notes_btn)
+        mode_box.append(mode_inner)
+        main_box.append(mode_box)
+
         # 2. Search Entry
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.add_css_class("search-bar")
@@ -155,10 +193,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.search_entry.connect("search-changed", self._on_search_changed)
         main_box.append(self.search_entry)
 
-        # 3. Category Filter Chips / Tabs
-        filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        filter_box.add_css_class("filter-box")
-        filter_box.set_halign(Gtk.Align.CENTER)
+        # 3. Category Filter Chips / Tabs (Cho chế độ Lịch sử)
+        self.filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.filter_box.add_css_class("filter-box")
+        self.filter_box.set_halign(Gtk.Align.CENTER)
 
         filters = [
             ("all", "filter_all"),
@@ -176,11 +214,33 @@ class MainWindow(Adw.ApplicationWindow):
                 btn.add_css_class("active")
             btn.connect("clicked", self._make_filter_handler(f_key))
             self._filter_buttons[f_key] = (btn, f_trans_key)
-            filter_box.append(btn)
+            self.filter_box.append(btn)
 
-        main_box.append(filter_box)
+        main_box.append(self.filter_box)
 
-        # 4. History List in Scrolled Window
+        # 3b. Notes Filter Chips (Cho chế độ Ghi chú)
+        self.notes_filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.notes_filter_box.add_css_class("filter-box")
+        self.notes_filter_box.set_halign(Gtk.Align.CENTER)
+        self.notes_filter_box.set_visible(False)
+
+        notes_filters = [
+            ("all", "filter_notes_all"),
+            ("pinned", "filter_notes_pinned")
+        ]
+
+        for nf_key, nf_trans_key in notes_filters:
+            btn = Gtk.Button(label=t(nf_trans_key, self.lang))
+            btn.add_css_class("filter-chip")
+            if nf_key == self.notes_filter:
+                btn.add_css_class("active")
+            btn.connect("clicked", self._make_notes_filter_handler(nf_key))
+            self._notes_filter_buttons[nf_key] = (btn, nf_trans_key)
+            self.notes_filter_box.append(btn)
+
+        main_box.append(self.notes_filter_box)
+
+        # 4. History/Notes List in Scrolled Window
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
         scrolled.set_hexpand(True)
@@ -204,10 +264,10 @@ class MainWindow(Adw.ApplicationWindow):
         empty_box.set_valign(Gtk.Align.CENTER)
         empty_box.set_halign(Gtk.Align.CENTER)
 
-        empty_icon = Gtk.Image.new_from_icon_name("edit-copy-symbolic")
-        empty_icon.set_pixel_size(64)
-        empty_icon.set_opacity(0.4)
-        empty_box.append(empty_icon)
+        self.empty_icon = Gtk.Image.new_from_icon_name("edit-copy-symbolic")
+        self.empty_icon.set_pixel_size(64)
+        self.empty_icon.set_opacity(0.4)
+        empty_box.append(self.empty_icon)
 
         self.empty_title = Gtk.Label(label=t("empty_title", self.lang))
         self.empty_title.add_css_class("empty-title")
@@ -217,6 +277,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.empty_desc.add_css_class("empty-desc")
         self.empty_desc.set_justify(Gtk.Justification.CENTER)
         empty_box.append(self.empty_desc)
+
+        # Action button inside empty state for Notes
+        self.empty_create_note_btn = Gtk.Button(label=t("btn_create_note", self.lang))
+        self.empty_create_note_btn.set_icon_name("list-add-symbolic")
+        self.empty_create_note_btn.add_css_class("suggested-action")
+        self.empty_create_note_btn.connect("clicked", self._on_open_create_note_dialog)
+        self.empty_create_note_btn.set_visible(False)
+        empty_box.append(self.empty_create_note_btn)
 
         self.stack.add_named(empty_box, "empty")
         main_box.append(self.stack)
@@ -258,19 +326,32 @@ class MainWindow(Adw.ApplicationWindow):
             self.search_entry.grab_focus()
             return True
 
+        # Ctrl+N -> Tạo ghi chú mới
+        if (state & Gdk.ModifierType.CONTROL_MASK) and (keyval == Gdk.KEY_n or keyval == Gdk.KEY_N):
+            self._on_open_create_note_dialog()
+            return True
+
         # Delete key on selected item -> delete it
         if keyval == Gdk.KEY_Delete:
             selected_row = self.list_box.get_selected_row()
-            if selected_row and hasattr(selected_row, "clip"):
-                self._delete_clip(selected_row.clip.get("id"))
-                return True
+            if selected_row:
+                if hasattr(selected_row, "note"):
+                    self._delete_note(selected_row.note.get("id"))
+                    return True
+                elif hasattr(selected_row, "clip"):
+                    self._delete_clip(selected_row.clip.get("id"))
+                    return True
 
         # Return / Enter key on selected item -> copy & paste
         if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             selected_row = self.list_box.get_selected_row()
-            if selected_row and hasattr(selected_row, "clip"):
-                self._select_clip(selected_row.clip)
-                return True
+            if selected_row:
+                if hasattr(selected_row, "note"):
+                    self._select_note(selected_row.note)
+                    return True
+                elif hasattr(selected_row, "clip"):
+                    self._select_clip(selected_row.clip)
+                    return True
 
         return False
 
@@ -301,17 +382,28 @@ class MainWindow(Adw.ApplicationWindow):
     def _update_localized_texts(self):
         """Update all static labels when language is changed."""
         self.title_widget.set_subtitle(t("app_subtitle", self.lang))
-        self._set_search_placeholder(t("search_placeholder", self.lang))
+        if self.current_mode == "notes":
+            self._set_search_placeholder(t("search_notes_placeholder", self.lang))
+        else:
+            self._set_search_placeholder(t("search_placeholder", self.lang))
+
         self.settings_btn.set_tooltip_text(t("tooltip_settings", self.lang))
         self.clear_btn.set_tooltip_text(t("tooltip_clear", self.lang))
+        self.create_note_btn.set_tooltip_text(t("tooltip_create_note", self.lang))
+        self.create_note_btn.set_label(t("btn_create_note", self.lang))
+        self.mode_history_btn.set_label(t("tab_history", self.lang))
+        self.mode_notes_btn.set_label(t("tab_notes", self.lang))
+        self.empty_create_note_btn.set_label(t("btn_create_note", self.lang))
+
         self.pause_lbl.set_text(t("pause_banner_text", self.lang))
         self.resume_btn.set_label(t("pause_banner_resume", self.lang))
-        self.empty_title.set_text(t("empty_title", self.lang))
-        self.empty_desc.set_text(t("empty_desc", self.lang))
         self.hint_lbl.set_text(t("status_hint", self.lang))
         self._update_theme_btn_ui()
 
         for k, (btn, trans_key) in self._filter_buttons.items():
+            btn.set_label(t(trans_key, self.lang))
+
+        for k, (btn, trans_key) in self._notes_filter_buttons.items():
             btn.set_label(t(trans_key, self.lang))
 
     def _update_theme_btn_ui(self):
@@ -333,21 +425,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.show_toast(toast_msg)
 
     def reload_history(self):
-        """Reload clips from SQLite and populate ListBox."""
+        """Reload clips or notes from SQLite and populate ListBox."""
         # Refresh current language
         self.lang = self.db.get_setting("language", "vi")
         self._update_localized_texts()
-
-        try:
-            max_limit = int(self.db.get_setting("max_history", "200"))
-        except (ValueError, TypeError):
-            max_limit = 200
-
-        clips = self.db.get_clips(
-            filter_type=self.current_filter,
-            query=self.current_query,
-            limit=max_limit
-        )
 
         # Clear existing rows
         while True:
@@ -356,28 +437,84 @@ class MainWindow(Adw.ApplicationWindow):
                 break
             self.list_box.remove(row)
 
-        if not clips:
-            self.stack.set_visible_child_name("empty")
+        if self.current_mode == "notes":
+            notes = self.db.get_notes(
+                query=self.current_query,
+                filter_pinned=(self.notes_filter == "pinned"),
+                limit=200,
+            )
+
+            if not notes:
+                self.empty_icon.set_from_icon_name("document-edit-symbolic")
+                self.empty_title.set_text(t("empty_notes_title", self.lang))
+                self.empty_desc.set_text(t("empty_notes_desc", self.lang))
+                self.empty_create_note_btn.set_visible(True)
+                self.stack.set_visible_child_name("empty")
+            else:
+                self.empty_create_note_btn.set_visible(False)
+                self.stack.set_visible_child_name("list")
+                for note in notes:
+                    row = NoteItemRow(
+                        note=note,
+                        on_select=self._select_note,
+                        on_edit=self._open_edit_note_dialog,
+                        on_pin=self._toggle_pin_note,
+                        on_delete=self._delete_note,
+                        lang=self.lang,
+                    )
+                    self.list_box.append(row)
+
+                first = self.list_box.get_row_at_index(0)
+                if first:
+                    self.list_box.select_row(first)
+
+            # Update notes stats
+            all_notes = self.db.get_notes(query="", filter_pinned=False, limit=1000)
+            pinned_count = sum(1 for n in all_notes if n.get("is_pinned"))
+            self.status_lbl.set_text(
+                t("status_notes_total", self.lang, total=len(all_notes), pinned=pinned_count)
+            )
+
         else:
-            self.stack.set_visible_child_name("list")
-            for clip in clips:
-                row = HistoryItemRow(
-                    clip=clip,
-                    on_select=self._select_clip,
-                    on_pin=self._toggle_pin,
-                    on_delete=self._delete_clip,
-                    lang=self.lang
-                )
-                self.list_box.append(row)
+            # Chế độ Clipboard History
+            try:
+                max_limit = int(self.db.get_setting("max_history", "200"))
+            except (ValueError, TypeError):
+                max_limit = 200
 
-            # Auto select first row
-            first = self.list_box.get_row_at_index(0)
-            if first:
-                self.list_box.select_row(first)
+            clips = self.db.get_clips(
+                filter_type=self.current_filter,
+                query=self.current_query,
+                limit=max_limit
+            )
 
-        # Update stats
-        stats = self.db.get_stats()
-        self.status_lbl.set_text(t("status_total", self.lang, total=stats['total'], pinned=stats['pinned']))
+            if not clips:
+                self.empty_icon.set_from_icon_name("edit-copy-symbolic")
+                self.empty_title.set_text(t("empty_title", self.lang))
+                self.empty_desc.set_text(t("empty_desc", self.lang))
+                self.empty_create_note_btn.set_visible(False)
+                self.stack.set_visible_child_name("empty")
+            else:
+                self.empty_create_note_btn.set_visible(False)
+                self.stack.set_visible_child_name("list")
+                for clip in clips:
+                    row = HistoryItemRow(
+                        clip=clip,
+                        on_select=self._select_clip,
+                        on_pin=self._toggle_pin,
+                        on_delete=self._delete_clip,
+                        lang=self.lang
+                    )
+                    self.list_box.append(row)
+
+                first = self.list_box.get_row_at_index(0)
+                if first:
+                    self.list_box.select_row(first)
+
+            # Update stats
+            stats = self.db.get_stats()
+            self.status_lbl.set_text(t("status_total", self.lang, total=stats['total'], pinned=stats['pinned']))
+
         self._update_record_status_ui()
 
     def _update_record_status_ui(self):
@@ -404,8 +541,95 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_toast(t("toast_record_paused", self.lang))
 
     def _on_row_activated(self, listbox, row):
-        if row and hasattr(row, "clip"):
-            self._select_clip(row.clip)
+        if row:
+            if hasattr(row, "note"):
+                self._select_note(row.note)
+            elif hasattr(row, "clip"):
+                self._select_clip(row.clip)
+
+    def set_mode(self, mode: str):
+        if self.current_mode == mode:
+            return
+        self.current_mode = mode
+        is_history = (mode == "history")
+
+        if is_history:
+            self.mode_history_btn.add_css_class("active")
+            self.mode_notes_btn.remove_css_class("active")
+            self.clear_btn.set_visible(True)
+            self.create_note_btn.set_visible(False)
+            self.filter_box.set_visible(True)
+            self.notes_filter_box.set_visible(False)
+            self._set_search_placeholder(t("search_placeholder", self.lang))
+        else:
+            self.mode_history_btn.remove_css_class("active")
+            self.mode_notes_btn.add_css_class("active")
+            self.clear_btn.set_visible(False)
+            self.create_note_btn.set_visible(True)
+            self.filter_box.set_visible(False)
+            self.notes_filter_box.set_visible(True)
+            self._set_search_placeholder(t("search_notes_placeholder", self.lang))
+
+        self.reload_history()
+
+    def _make_notes_filter_handler(self, filter_key: str):
+        def handler(button):
+            self.notes_filter = filter_key
+            for k, (btn, _) in self._notes_filter_buttons.items():
+                if k == filter_key:
+                    btn.add_css_class("active")
+                else:
+                    btn.remove_css_class("active")
+            self.reload_history()
+        return handler
+
+    def _on_open_create_note_dialog(self, _btn=None):
+        dialog = NoteEditorDialog(
+            parent_window=self,
+            on_saved=self._on_note_saved,
+            lang=self.lang,
+        )
+        dialog.present()
+
+    def _open_edit_note_dialog(self, note: Dict[str, Any]):
+        dialog = NoteEditorDialog(
+            parent_window=self,
+            on_saved=self._on_note_saved,
+            note_id=note.get("id"),
+            initial_title=note.get("title") or "",
+            initial_content=note.get("content") or "",
+            lang=self.lang,
+        )
+        dialog.present()
+
+    def _on_note_saved(self, title: str, content: str, note_id: Optional[int]):
+        if note_id:
+            self.db.update_note(note_id, title=title, content=content)
+            self.show_toast(t("toast_note_updated", self.lang))
+        else:
+            self.db.add_note(title=title, content=content)
+            self.show_toast(t("toast_note_saved", self.lang))
+        self.reload_history()
+
+    def _select_note(self, note: Dict[str, Any]):
+        """Copy note content into clipboard and simulate paste."""
+        self.clipboard_mgr.copy_to_clipboard(
+            {"type": "text", "content": note.get("content", "")},
+            auto_paste=True,
+        )
+        self.show_toast(t("toast_note_copied", self.lang))
+        self.hide()
+
+    def _toggle_pin_note(self, note_id: int):
+        is_pinned = self.db.toggle_pin_note(note_id)
+        msg = t("toast_pinned", self.lang) if is_pinned else t("toast_unpinned", self.lang)
+        self.show_toast(msg)
+        self.reload_history()
+
+    def _delete_note(self, note_id: int):
+        self.db.delete_note(note_id)
+        self.show_toast(t("toast_note_deleted", self.lang))
+        self.reload_history()
 
     def _select_clip(self, clip: Dict[str, Any]):
         """Copy selected clip back into clipboard and simulate paste."""
