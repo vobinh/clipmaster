@@ -17,7 +17,22 @@
 
 - ⚡ **Phím tắt toàn cục Win + V (`Super + V`)**: Bấm `Win + V` bất cứ lúc nào trên desktop để bật/tắt cửa sổ danh sách clipboard.
 - 🎨 **Giao diện hiện đại & Dark Mode (GTK4 + Libadwaita)**: Thiết kế đẹp mắt, bo tròn tinh tế, hỗ trợ đầy đủ **Chế độ Tối (Dark Mode)**, **Chế độ Sáng (Light Mode)** và **Tự động theo hệ thống**. Nút chuyển đổi nhanh Dark/Light ngay trên thanh tiêu đề!
-- 🔍 **Tìm kiếm nhanh tức thì**: Hỗ trợ tìm kiếm theo từ khóa trong toàn bộ nội dung đã sao chép (`Ctrl + F`).
+- 📝 **Tab Ghi chú riêng biệt (Personal Notes) & Nút FAB**:
+  - Quản lý ghi chú cá nhân tiện lợi bên cạnh lịch sử clipboard với 2 tab chuyển đổi `📋 Lịch sử` và `📝 Ghi chú`.
+  - Nút Floating Action Button (FAB) `+` nổi ở góc phải giúp tạo ghi chú mới tức thì (`Ctrl + N`).
+  - Hỗ trợ ghim ghi chú quan trọng, chỉnh sửa, sao chép 1-click hoặc dán nhanh.
+- 🔒 **Bảo mật mã PIN 4 số cho Ghi chú**:
+  - Tùy chọn cài đặt mã PIN bảo vệ toàn bộ ghi chú riêng tư.
+  - Màn hình mở khóa bằng bàn phím số ảo hoặc bàn phím máy tính cực kỳ bảo mật và trực quan.
+  - Tự động khóa linh hoạt: Khóa ngay lập tức khi chuyển tab, sau 1 phút, 5 phút, 15 phút, 30 phút hoặc chỉ khi tắt app.
+  - **Cơ chế chống dò mã PIN**: Tự động khóa và đếm ngược 30 giây sau mỗi 3 lần nhập sai liên tiếp.
+- ☁️ **Đồng bộ đám mây / Máy chủ riêng (BYOS - Bring Your Own Server)**:
+  - Đồng bộ hóa lịch sử clipboard và ghi chú cá nhân xuyên suốt các thiết bị máy tính qua máy chủ riêng (Cloud / Self-hosted).
+  - Hỗ trợ linh hoạt 3 chế độ đồng bộ: **Đồng bộ 2 chiều (Hai chiều)**, **Chỉ đồng bộ lên (Tải lên)**, hoặc **Chỉ đồng bộ xuống (Tải về)**.
+  - Tự động cấu hình và tạo bảng dữ liệu trên server cho người dùng mới hoàn toàn khi kết nối lần đầu.
+- 🔍 **Thanh Tìm kiếm & Bộ lọc gộp 1 dòng thông minh**:
+  - Gộp nút Tìm kiếm `[ 🔍 ]` và các thẻ lọc thể loại trên cùng một hàng giúp tiết kiệm chiều cao cửa sổ.
+  - Nút tìm kiếm đặt ở đầu dòng, khi click hoặc nhấn `Ctrl + F` sẽ mở rộng toàn dòng mượt mà với hiệu ứng chuyển cảnh; bấm `Esc` hoặc xóa rỗng sẽ tự thu gọn lại.
 - 🏷️ **Tự động nhận diện nội dung thông minh**:
   - 📝 **Văn bản thông thường (Text)**: Hiển thị độ dài và số dòng.
   - 💻 **Mã nguồn (Code)**: Nhận diện cú pháp lập trình, hiển thị font monospace.
@@ -158,9 +173,10 @@ Bạn có thể thay đổi phím tắt bất kỳ lúc nào trực tiếp trong
 | **Win + V** (`Super + V`) | Mở hoặc đóng ClipMaster từ bất kỳ đâu |
 | **Mũi tên Lên / Xuống** | Di chuyển lựa chọn giữa các mục |
 | **Enter** | Sao chép mục đã chọn & tự động dán |
-| **Ctrl + F** | Đưa con trỏ vào ô tìm kiếm |
+| **Ctrl + F** | Mở rộng thanh tìm kiếm và focus ô nhập |
+| **Ctrl + N** | Tạo ghi chú mới nhanh chóng |
 | **Delete** | Xóa mục đang được chọn |
-| **Esc** | Đóng cửa sổ ClipMaster |
+| **Esc** | Thu gọn tìm kiếm / Quay lại từ màn hình PIN / Đóng cửa sổ |
 
 ---
 
@@ -168,28 +184,33 @@ Bạn có thể thay đổi phím tắt bất kỳ lúc nào trực tiếp trong
 
 ```
 clipMaster/
-├── clipmaster.py          # Điểm khởi chạy chính của ứng dụng
-├── install.sh             # Script cài đặt tự động 1-click
-├── uninstall.sh           # Script gỡ cài đặt
-├── build_deb.sh           # Script đóng gói thành file cài .deb
+├── clipmaster.py            # Điểm khởi chạy chính của ứng dụng
+├── install.sh               # Script cài đặt tự động 1-click
+├── uninstall.sh             # Script gỡ cài đặt
+├── build_deb.sh             # Script đóng gói thành file cài .deb
 ├── snap/
-│   ├── snapcraft.yaml     # Cấu hình đóng gói Snapcraft (Snap Store)
-│   └── gui/               # Desktop launcher và icon cho Snap
+│   ├── snapcraft.yaml       # Cấu hình đóng gói Snapcraft (Snap Store)
+│   └── gui/                 # Desktop launcher và icon cho Snap
 ├── assets/
-│   ├── icon.svg           # Icon vector của ứng dụng
-│   └── style.css          # Giao diện CSS tùy biến (Dark/Light card design)
+│   ├── icon.svg             # Icon vector của ứng dụng
+│   └── style.css            # Giao diện CSS tùy biến (Dark/Light card design)
 └── src/
-    ├── database.py        # Quản lý cơ sở dữ liệu SQLite lưu lịch sử
+    ├── database.py          # Quản lý cơ sở dữ liệu SQLite lưu lịch sử & ghi chú
     ├── clipboard_manager.py # Bộ theo dõi và đồng bộ clipboard ngầm
+    ├── sync_manager.py      # Bộ đồng bộ hóa Cloud / BYOS (Upload, Download, 2-way)
     ├── shortcut_manager.py  # Đăng ký phím tắt Win+V với GNOME
     ├── theme_manager.py     # Quản lý Dark/Light/System theme qua Libadwaita
     ├── i18n.py              # Đa ngôn ngữ (Tiếng Việt & English)
-    ├── utils.py           # Phân loại định dạng & format thời gian
+    ├── utils.py             # Phân loại định dạng & format thời gian
     └── ui/
-        ├── main_window.py     # Cửa sổ chính Adw.ApplicationWindow
-        ├── history_item_row.py # Card hiển thị từng mục clipboard
-        ├── settings_dialog.py # Cửa sổ tùy chọn và cấu hình
-        └── shortcut_dialog.py # Dialog ghi nhận phím tắt bàn phím
+        ├── main_window.py       # Cửa sổ chính Adw.ApplicationWindow
+        ├── history_item_row.py  # Card hiển thị từng mục clipboard
+        ├── note_item_row.py     # Card hiển thị từng mục ghi chú
+        ├── note_editor_dialog.py # Dialog tạo & chỉnh sửa ghi chú
+        ├── pin_dialog.py        # Dialog cài đặt & đổi mã PIN bảo mật
+        ├── sync_setup_dialog.py # Dialog cấu hình đồng bộ hóa Cloud/BYOS
+        ├── settings_dialog.py   # Cửa sổ tùy chọn và cấu hình
+        └── shortcut_dialog.py   # Dialog ghi nhận phím tắt bàn phím
 ```
 
 ---
@@ -231,7 +252,22 @@ Mọi phím tắt và dịch vụ nền sẽ được khôi phục về mặc đ
 
 - ⚡ **Global Shortcut Win + V (`Super + V`)**: Press `Win + V` anywhere on your desktop to toggle the clipboard history popup.
 - 🎨 **Modern Interface & Dark Mode (GTK4 + Libadwaita)**: Gorgeous rounded card aesthetics with full support for **Dark Mode**, **Light Mode**, and **System Default**. Quick theme toggle button right on the header bar!
-- 🔍 **Instant Search**: Quickly filter through copied text and content (`Ctrl + F`).
+- 📝 **Dedicated Personal Notes & Floating Action Button (FAB)**:
+  - Keep important notes separate from clipboard history via seamless tab switching (`📋 History` & `📝 Notes`).
+  - Floating Action Button (FAB) `+` in the bottom-right corner for rapid note creation (`Ctrl + N`).
+  - Pin, edit, 1-click copy, or delete notes effortlessly.
+- 🔒 **4-Digit PIN Security for Notes**:
+  - Optional 4-digit PIN protection to keep your private notes secure.
+  - Sleek lock screen with on-screen numeric keypad and hardware keyboard support.
+  - Configurable auto-lock timeout: Immediately upon switching tabs, 1 minute, 5 minutes, 15 minutes, 30 minutes, or on app exit.
+  - **Brute-force lockout**: Automatically triggers a 30-second live countdown lock after every 3 consecutive incorrect PIN attempts.
+- ☁️ **Cloud & BYOS (Bring Your Own Server) Synchronization**:
+  - Sync both clipboard history and notes across multiple machines via custom server or cloud backends.
+  - 3 flexible sync modes: **Two-way Sync (Upload & Download)**, **Upload Only**, or **Download Only**.
+  - Automatic database schema bootstrapping on fresh server setups upon first connection.
+- 🔍 **Unified Single-Row Search & Filter Bar**:
+  - Search button `[ 🔍 ]` and filter chips combined into a single compact row to maximize vertical reading area.
+  - Positioned at the start of the row, clicking the search icon or pressing `Ctrl + F` smoothly expands into a full search bar; pressing `Esc` or clearing focus collapses it back.
 - 🏷️ **Smart Content Detection**:
   - 📝 **Plain Text**: Displays character and line count.
   - 💻 **Source Code**: Recognizes programming syntax, rendered in monospace typography.
@@ -372,9 +408,10 @@ You can customize your activation shortcut anytime inside the app:
 | **Win + V** (`Super + V`) | Toggle ClipMaster from anywhere |
 | **Up / Down Arrows** | Navigate through history items |
 | **Enter** | Copy selected clip & auto-paste |
-| **Ctrl + F** | Focus the search bar |
+| **Ctrl + F** | Expand search bar and focus input |
+| **Ctrl + N** | Create a new personal note |
 | **Delete** | Delete the selected clip |
-| **Esc** | Close the ClipMaster window |
+| **Esc** | Collapse search / Return from PIN screen / Close window |
 
 ---
 
@@ -382,28 +419,33 @@ You can customize your activation shortcut anytime inside the app:
 
 ```
 clipMaster/
-├── clipmaster.py          # Application entry point
-├── install.sh             # 1-click automated installer
-├── uninstall.sh           # Clean uninstaller
-├── build_deb.sh           # Debian package builder
+├── clipmaster.py            # Application entry point
+├── install.sh               # 1-click automated installer
+├── uninstall.sh             # Clean uninstaller
+├── build_deb.sh             # Debian package builder
 ├── snap/
-│   ├── snapcraft.yaml     # Snapcraft package configuration (Snap Store)
-│   └── gui/               # Desktop launcher and application icon for Snap
+│   ├── snapcraft.yaml       # Snapcraft package configuration (Snap Store)
+│   └── gui/                 # Desktop launcher and application icon for Snap
 ├── assets/
-│   ├── icon.svg           # High-resolution vector icon
-│   └── style.css          # Custom stylesheet (Dark/Light card design)
+│   ├── icon.svg             # High-resolution vector icon
+│   └── style.css            # Custom stylesheet (Dark/Light card design)
 └── src/
-    ├── database.py        # SQLite history and preferences database
-    ├── clipboard_manager.py # Background clipboard monitor and sync
+    ├── database.py          # SQLite history, notes, and preferences database
+    ├── clipboard_manager.py # Background clipboard monitor and daemon
+    ├── sync_manager.py      # Cloud / BYOS sync engine (Upload, Download, 2-way)
     ├── shortcut_manager.py  # GNOME global shortcut binding
     ├── theme_manager.py     # Libadwaita Dark/Light/System theme manager
     ├── i18n.py              # Internationalization (Vietnamese & English)
-    ├── utils.py           # Content type heuristics and formatters
+    ├── utils.py             # Content type heuristics and formatters
     └── ui/
-        ├── main_window.py     # Main Adw.ApplicationWindow
-        ├── history_item_row.py # Card row rendering component
-        ├── settings_dialog.py # Preferences window
-        └── shortcut_dialog.py # Interactive shortcut recorder dialog
+        ├── main_window.py       # Main Adw.ApplicationWindow
+        ├── history_item_row.py  # Card row rendering component
+        ├── note_item_row.py     # Note card row rendering component
+        ├── note_editor_dialog.py # Note editor modal dialog
+        ├── pin_dialog.py        # 4-digit PIN setup and change dialog
+        ├── sync_setup_dialog.py # Cloud & BYOS sync configuration modal
+        ├── settings_dialog.py   # Preferences window
+        └── shortcut_dialog.py   # Interactive shortcut recorder dialog
 ```
 
 ---
