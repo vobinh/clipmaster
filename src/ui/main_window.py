@@ -49,6 +49,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._notes_unlocked_this_visit: bool = False
         self._pin_buffer: str = ""
         self.pin_dots = []
+        self._pin_failed_attempts: int = 0
+        self._pin_lockout_until: float = 0.0
+        self._lockout_timer_id: Optional[int] = None
 
         # Apply saved theme mode
         apply_theme_mode(self.db.get_setting("theme_mode", "dark"))
@@ -347,6 +350,14 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_key_pressed(self, controller, keyval, keycode, state):
         # Nếu đang ở màn hình khóa PIN của Ghi chú:
         if self.current_mode == "notes" and not self._is_notes_unlocked():
+            if keyval == Gdk.KEY_Escape:
+                self.set_mode("history")
+                return True
+
+            # Nếu đang bị khóa tạm thời 30s do sai 3 lần thì chặn nhập phím
+            if self._is_pin_locked_out():
+                return True
+
             # Phím số (0-9 trên hàng phím chính hoặc bàn phím số Numpad)
             digit = None
             if 48 <= keyval <= 57:
@@ -364,10 +375,6 @@ class MainWindow(Adw.ApplicationWindow):
 
             if keyval in (Gdk.KEY_Delete, Gdk.KEY_c, Gdk.KEY_C):
                 self._handle_pin_clear()
-                return True
-
-            if keyval == Gdk.KEY_Escape:
-                self.set_mode("history")
                 return True
 
             # Chặn các phím khác khi đang ở màn hình khóa PIN
@@ -576,9 +583,9 @@ class MainWindow(Adw.ApplicationWindow):
         box.append(self.pin_error_lbl)
 
         # 5. Numeric Keypad (3x4 Grid)
-        keypad_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        keypad_box.add_css_class("pin-keypad-box")
-        keypad_box.set_halign(Gtk.Align.CENTER)
+        self.pin_keypad_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.pin_keypad_box.add_css_class("pin-keypad-box")
+        self.pin_keypad_box.set_halign(Gtk.Align.CENTER)
 
         key_rows = [
             [("1", "1"), ("2", "2"), ("3", "3")],
@@ -603,9 +610,9 @@ class MainWindow(Adw.ApplicationWindow):
                 else:
                     btn.connect("clicked", self._make_digit_btn_handler(action_type))
                 row_box.append(btn)
-            keypad_box.append(row_box)
+            self.pin_keypad_box.append(row_box)
 
-        box.append(keypad_box)
+        box.append(self.pin_keypad_box)
 
         # 6. Back to History Button
         self.pin_back_btn = Gtk.Button(label=t("btn_back_to_history", self.lang))
@@ -622,7 +629,53 @@ class MainWindow(Adw.ApplicationWindow):
             self._handle_pin_key(digit)
         return _handler
 
+    def _is_pin_locked_out(self) -> bool:
+        return time.time() < self._pin_lockout_until
+
+    def _start_lockout_countdown(self, seconds: int = 30):
+        self._pin_lockout_until = time.time() + float(seconds)
+        self._pin_buffer = ""
+        self._update_pin_dots(is_error=True)
+        self._set_keypad_sensitive(False)
+        self._update_lockout_display()
+
+        self._stop_lockout_timer()
+        self._lockout_timer_id = GLib.timeout_add(1000, self._on_lockout_tick)
+
+    def _on_lockout_tick(self) -> bool:
+        remaining = int(self._pin_lockout_until - time.time())
+        if remaining > 0:
+            self._update_lockout_display()
+            return True
+        else:
+            self._pin_lockout_until = 0.0
+            self._pin_failed_attempts = 0
+            self._lockout_timer_id = None
+            self._set_keypad_sensitive(True)
+            self._update_pin_dots()
+            self.pin_error_lbl.set_visible(False)
+            self.pin_lock_sub.set_text(t("pin_lock_subtitle", self.lang))
+            return False
+
+    def _update_lockout_display(self):
+        remaining = max(1, int(self._pin_lockout_until - time.time()))
+        msg = t("pin_lockout_msg", self.lang, seconds=remaining)
+        self.pin_error_lbl.set_text(msg)
+        self.pin_error_lbl.set_visible(True)
+        self.pin_lock_sub.set_text(msg)
+
+    def _stop_lockout_timer(self):
+        if self._lockout_timer_id is not None:
+            GLib.source_remove(self._lockout_timer_id)
+            self._lockout_timer_id = None
+
+    def _set_keypad_sensitive(self, sensitive: bool):
+        if hasattr(self, "pin_keypad_box"):
+            self.pin_keypad_box.set_sensitive(sensitive)
+
     def _handle_pin_key(self, digit: str):
+        if self._is_pin_locked_out():
+            return
         if len(self._pin_buffer) >= 4:
             return
         self.pin_error_lbl.set_visible(False)
@@ -633,12 +686,16 @@ class MainWindow(Adw.ApplicationWindow):
             self._verify_pin_buffer()
 
     def _handle_pin_backspace(self):
+        if self._is_pin_locked_out():
+            return
         if self._pin_buffer:
             self._pin_buffer = self._pin_buffer[:-1]
             self.pin_error_lbl.set_visible(False)
             self._update_pin_dots()
 
     def _handle_pin_clear(self):
+        if self._is_pin_locked_out():
+            return
         self._pin_buffer = ""
         self.pin_error_lbl.set_visible(False)
         self._update_pin_dots()
@@ -657,24 +714,38 @@ class MainWindow(Adw.ApplicationWindow):
                     dot.remove_css_class("filled")
 
     def _verify_pin_buffer(self):
+        if self._is_pin_locked_out():
+            return
+
         pin = self._pin_buffer
         if self.db.verify_notes_pin(pin):
+            self._pin_failed_attempts = 0
+            self._pin_lockout_until = 0.0
+            self._stop_lockout_timer()
+            self._set_keypad_sensitive(True)
             self._unlock_notes_session()
             self._pin_buffer = ""
             self._update_pin_dots()
             self.pin_error_lbl.set_visible(False)
             self.reload_history()
         else:
+            self._pin_failed_attempts += 1
             self._update_pin_dots(is_error=True)
-            self.pin_error_lbl.set_text(t("pin_error_incorrect", self.lang))
-            self.pin_error_lbl.set_visible(True)
 
-            def _reset_after_error():
-                self._pin_buffer = ""
-                self._update_pin_dots()
-                return False
+            if self._pin_failed_attempts >= 3:
+                self._start_lockout_countdown(30)
+            else:
+                remaining_attempts = 3 - self._pin_failed_attempts
+                err_text = t("pin_attempts_warning", self.lang, remaining=remaining_attempts)
+                self.pin_error_lbl.set_text(err_text)
+                self.pin_error_lbl.set_visible(True)
 
-            GLib.timeout_add(700, _reset_after_error)
+                def _reset_after_error():
+                    self._pin_buffer = ""
+                    self._update_pin_dots()
+                    return False
+
+                GLib.timeout_add(700, _reset_after_error)
 
     def reload_history(self):
         """Reload clips or notes from SQLite and populate ListBox."""
@@ -699,9 +770,17 @@ class MainWindow(Adw.ApplicationWindow):
                 self.empty_create_note_btn.set_visible(False)
                 self._pin_buffer = ""
                 self._update_pin_dots()
-                self.pin_error_lbl.set_visible(False)
                 self.stack.set_visible_child_name("pin_lock")
                 self.status_lbl.set_text(t("pin_lock_title", self.lang))
+
+                if self._is_pin_locked_out():
+                    self._set_keypad_sensitive(False)
+                    self._update_lockout_display()
+                else:
+                    self._set_keypad_sensitive(True)
+                    self.pin_error_lbl.set_visible(False)
+                    self.pin_lock_sub.set_text(t("pin_lock_subtitle", self.lang))
+
                 self._update_record_status_ui()
                 return
 
