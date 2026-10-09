@@ -4,9 +4,9 @@
   "description": "ClipMaster - Cross-platform Modern Clipboard Manager in Rust & Tauri v2",
   "private": true,
   "scripts": {
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "tauri": "tauri"
+    "dev": "node scripts/tauri.js dev",
+    "build": "node scripts/tauri.js build",
+    "tauri": "node scripts/tauri.js"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.1"
