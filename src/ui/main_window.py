@@ -603,12 +603,20 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.present()
 
     def _on_note_saved(self, title: str, content: str, note_id: Optional[int]):
+        saved_note = None
         if note_id:
             self.db.update_note(note_id, title=title, content=content)
             self.show_toast(t("toast_note_updated", self.lang))
+            saved_note = self.db.get_note_by_id(note_id)
         else:
-            self.db.add_note(title=title, content=content)
+            new_id = self.db.add_note(title=title, content=content)
             self.show_toast(t("toast_note_saved", self.lang))
+            if new_id:
+                saved_note = self.db.get_note_by_id(new_id)
+
+        if self.sync_mgr and saved_note:
+            self.sync_mgr.push_note(saved_note)
+
         if self.current_mode != "notes":
             self.set_mode("notes")
         else:
@@ -629,10 +637,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.show_toast(msg)
         self.reload_history()
 
+        if self.sync_mgr:
+            note = self.db.get_note_by_id(note_id)
+            if note:
+                self.sync_mgr.push_note(note)
+
     def _delete_note(self, note_id: int):
+        note = self.db.get_note_by_id(note_id)
         self.db.delete_note(note_id)
         self.show_toast(t("toast_note_deleted", self.lang))
         self.reload_history()
+
+        if self.sync_mgr and note:
+            self.sync_mgr.push_delete_note(note.get("content_hash", ""))
 
     def _select_clip(self, clip: Dict[str, Any]):
         """Copy selected clip back into clipboard and simulate paste."""

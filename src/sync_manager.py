@@ -59,6 +59,38 @@ BEGIN
             WITH CHECK (true);
     END IF;
 END $$;
+
+-- Bảng lưu trữ Ghi chú cá nhân (user_notes)
+CREATE TABLE IF NOT EXISTS user_notes (
+    id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    content_hash TEXT NOT NULL UNIQUE,
+    title        TEXT,
+    content      TEXT NOT NULL,
+    is_pinned    INTEGER DEFAULT 0,
+    color        TEXT,
+    created_at   TIMESTAMPTZ NOT NULL,
+    updated_at   TIMESTAMPTZ NOT NULL,
+    deleted_at   TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_updated
+    ON user_notes(updated_at DESC)
+    WHERE deleted_at IS NULL;
+
+ALTER TABLE user_notes ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'user_notes' AND policyname = 'allow_anon_all_notes'
+    ) THEN
+        CREATE POLICY allow_anon_all_notes ON user_notes
+            FOR ALL
+            TO anon, authenticated
+            USING (true)
+            WITH CHECK (true);
+    END IF;
+END $$;
 """
 
 
@@ -436,6 +468,84 @@ class SyncManager:
             print(f"[Sync] pull_all error: {e}")
             return []
 
+    # ── Thao tác Đồng bộ Ghi chú (Notes Sync) ──
+
+    def push_note(self, note: dict) -> bool:
+        """
+        Đẩy 1 ghi chú (vừa tạo, sửa hoặc đổi ghim) lên Supabase user_notes.
+        Chạy trong background thread.
+        """
+        if not self.is_configured():
+            return False
+        if self.db.get_setting("sync_direction", "both") == "download_only":
+            return False
+
+        def _push():
+            try:
+                record = {
+                    "content_hash": note["content_hash"],
+                    "title": note.get("title") or "",
+                    "content": note.get("content", ""),
+                    "is_pinned": 1 if note.get("is_pinned") else 0,
+                    "color": note.get("color"),
+                    "created_at": _ts_to_iso(note.get("created_at", time.time())),
+                    "updated_at": _ts_to_iso(note.get("updated_at", time.time())),
+                    "deleted_at": None,
+                }
+                self._rest_request(
+                    method="POST",
+                    path="/user_notes?on_conflict=content_hash",
+                    data=record,
+                    extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                )
+            except Exception as e:
+                print(f"[Sync] push_note error: {e}")
+
+        import time
+        threading.Thread(target=_push, daemon=True).start()
+        return True
+
+    def push_delete_note(self, content_hash: str) -> bool:
+        """
+        Xóa ghi chú khỏi Supabase khi người dùng xóa trên máy này.
+        """
+        if not self.is_configured():
+            return False
+        if self.db.get_setting("sync_direction", "both") == "download_only":
+            return False
+
+        def _del():
+            try:
+                quoted = urllib.parse.quote(content_hash)
+                self._rest_request(
+                    method="DELETE",
+                    path=f"/user_notes?content_hash=eq.{quoted}",
+                )
+            except Exception as e:
+                print(f"[Sync] push_delete_note error: {e}")
+
+        threading.Thread(target=_del, daemon=True).start()
+        return True
+
+    def pull_all_notes(self, timeout: float = 8.0) -> list[dict]:
+        """Kéo toàn bộ ghi chú từ user_notes trên Supabase về."""
+        if not self.is_configured():
+            return []
+        try:
+            data = self._rest_request(
+                method="GET",
+                path="/user_notes?select=*&order=updated_at.desc",
+                timeout=timeout,
+            )
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            err_str = str(e)
+            if "404" in err_str:
+                # Bảng user_notes chưa được tạo trên Supabase
+                raise RuntimeError("TABLE_USER_NOTES_NOT_FOUND: Chưa tạo bảng user_notes trên Supabase")
+            print(f"[Sync] pull_all_notes error: {e}")
+            return []
+
     # ── Sync hai chiều tổng hợp ─────────────────
 
     def sync_on_startup(
@@ -444,7 +554,7 @@ class SyncManager:
         timeout: float = 8.0,
     ) -> tuple[bool, str]:
         """
-        Đồng bộ linh hoạt theo hướng đã chọn (both, download_only, upload_only):
+        Đồng bộ linh hoạt cả Pinned Clips và Ghi chú (Notes):
         - both: Đầy đủ 2 chiều (vừa kéo về vừa đẩy lên).
         - download_only: Chỉ kéo từ Cloud về Local, không bao giờ ghi đè Cloud.
         - upload_only: Chỉ đẩy từ Local lên Cloud (backup), không kéo về.
@@ -459,6 +569,10 @@ class SyncManager:
         pulled = 0
         pushed = 0
         unpinned = 0
+        pulled_notes = 0
+        pushed_notes = 0
+        deleted_notes = 0
+        notes_table_missing = False
 
         try:
             import time
@@ -475,7 +589,7 @@ class SyncManager:
 
             cloud_hashes = {}
 
-            # 1. Kéo từ Cloud về Local (chạy khi direction là "both" hoặc "download_only")
+            # 1. Kéo Pinned Clips từ Cloud về Local
             if direction in ("both", "download_only"):
                 cloud_items = self.pull_all(timeout=timeout)
                 cloud_hashes = {
@@ -497,7 +611,7 @@ class SyncManager:
                             self.db.unpin_by_hash(l_hash)
                             unpinned += 1
 
-            # 2. Đẩy từ Local lên Cloud (chạy khi direction là "both" hoặc "upload_only")
+            # 2. Đẩy Pinned Clips từ Local lên Cloud
             if direction in ("both", "upload_only"):
                 local_pinned = self.db.get_pinned_for_sync()
                 to_push = []
@@ -508,22 +622,16 @@ class SyncManager:
                         continue
 
                     if direction == "both" and l_hash in cloud_hashes:
-                        # Đã có trên cả 2 bên -> đồng bộ
                         continue
 
-                    # Mục này có ở Local nhưng KHÔNG có trên Cloud:
                     clip_updated_at = clip.get("updated_at", 0.0)
 
                     if direction == "both" and last_sync_ts > 0 and clip_updated_at <= last_sync_ts:
-                        # Clip này đã tồn tại trước lần sync trước, nhưng giờ Cloud không còn
-                        # -> nghĩa là máy khác đã bỏ ghim / xóa khỏi Cloud -> unpin ở Local!
                         self.db.unpin_by_hash(l_hash)
                         unpinned += 1
                     else:
-                        # Clip này mới ở Local -> đẩy lên Cloud!
                         to_push.append(clip)
 
-                # 3. Gửi batch lên Cloud
                 if to_push:
                     now = _now_iso()
                     records = [
@@ -553,6 +661,95 @@ class SyncManager:
                         error_msg = str(e)
                         success = False
 
+            # ──────────────────────────────────────────
+            # 3. Đồng bộ Ghi chú (Notes Sync - Tất cả ghi chú)
+            # ──────────────────────────────────────────
+            cloud_notes_hashes = {}
+
+            # 3a. Kéo Ghi chú từ Cloud về Local
+            if direction in ("both", "download_only"):
+                try:
+                    cloud_notes_list = self.pull_all_notes(timeout=timeout)
+                    cloud_notes_hashes = {
+                        item["content_hash"]: item
+                        for item in cloud_notes_list
+                        if "content_hash" in item
+                    }
+
+                    for c_hash, item in cloud_notes_hashes.items():
+                        if self.db.upsert_note_from_cloud(item):
+                            pulled_notes += 1
+
+                    if direction == "download_only" and cloud_notes_list:
+                        for l_note in self.db.get_all_notes_for_sync():
+                            l_hash = l_note.get("content_hash")
+                            if l_hash and l_hash not in cloud_notes_hashes:
+                                self.db.delete_note_by_hash(l_hash)
+                                deleted_notes += 1
+                except Exception as e:
+                    if "user_notes" in str(e).lower() or "404" in str(e):
+                        notes_table_missing = True
+                    print(f"[Sync] Notes pull error: {e}")
+
+            # 3b. Đẩy Ghi chú từ Local lên Cloud
+            if direction in ("both", "upload_only") and not notes_table_missing:
+                try:
+                    local_notes = self.db.get_all_notes_for_sync()
+                    notes_to_push = []
+
+                    for l_note in local_notes:
+                        l_hash = l_note.get("content_hash")
+                        if not l_hash:
+                            continue
+
+                        if direction == "both" and l_hash in cloud_notes_hashes:
+                            c_item = cloud_notes_hashes[l_hash]
+                            c_updated_str = c_item.get("updated_at")
+                            try:
+                                dt = datetime.fromisoformat(c_updated_str.replace("Z", "+00:00"))
+                                c_ts = dt.timestamp()
+                            except Exception:
+                                c_ts = 0.0
+
+                            l_updated = l_note.get("updated_at", 0.0)
+                            if l_updated > c_ts + 0.5:
+                                notes_to_push.append(l_note)
+                            continue
+
+                        l_updated = l_note.get("updated_at", 0.0)
+                        if direction == "both" and last_sync_ts > 0 and l_updated <= last_sync_ts:
+                            self.db.delete_note_by_hash(l_hash)
+                            deleted_notes += 1
+                        else:
+                            notes_to_push.append(l_note)
+
+                    if notes_to_push:
+                        records = [
+                            {
+                                "content_hash": n["content_hash"],
+                                "title": n.get("title") or "",
+                                "content": n["content"],
+                                "is_pinned": 1 if n.get("is_pinned") else 0,
+                                "color": n.get("color"),
+                                "created_at": _ts_to_iso(n.get("created_at", time.time())),
+                                "updated_at": _ts_to_iso(n.get("updated_at", time.time())),
+                                "deleted_at": None,
+                            }
+                            for n in notes_to_push
+                        ]
+                        self._rest_request(
+                            method="POST",
+                            path="/user_notes?on_conflict=content_hash",
+                            data=records,
+                            extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                            timeout=timeout,
+                        )
+                        pushed_notes = len(records)
+                except Exception as e:
+                    if "user_notes" in str(e).lower() or "404" in str(e):
+                        notes_table_missing = True
+                    print(f"[Sync] Notes push error: {e}")
+
             # Cập nhật thời điểm sync
             if success:
                 self.db.set_setting("last_sync_at", str(time.time()))
@@ -563,6 +760,15 @@ class SyncManager:
                     msg_parts.append(f"↑{pushed}")
                 if unpinned:
                     msg_parts.append(f"✕{unpinned}")
+                if pulled_notes:
+                    msg_parts.append(f"📝↓{pulled_notes}")
+                if pushed_notes:
+                    msg_parts.append(f"📝↑{pushed_notes}")
+                if deleted_notes:
+                    msg_parts.append(f"📝✕{deleted_notes}")
+                if notes_table_missing:
+                    msg_parts.append("⚠️ Cần tạo bảng user_notes trên Supabase")
+
                 change_str = f" ({', '.join(msg_parts)})" if msg_parts else ""
                 msg = f"Đồng bộ thành công{change_str}"
             else:

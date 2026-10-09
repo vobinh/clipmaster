@@ -490,3 +490,74 @@ class Database:
             row = cur.fetchone()
             return dict(row) if row else None
 
+    def get_all_notes_for_sync(self) -> list[dict]:
+        """Lấy tất cả ghi chú phục vụ đồng bộ đám mây."""
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM notes")
+            return [dict(r) for r in cur.fetchall()]
+
+    def upsert_note_from_cloud(self, remote_note: dict) -> bool:
+        """
+        Đồng bộ 1 ghi chú từ Cloud về SQLite.
+        - Nếu chưa có content_hash: thêm mới.
+        - Nếu đã có: cập nhật nếu cloud có updated_at mới hơn.
+        """
+        content_hash = remote_note.get("content_hash")
+        content = remote_note.get("content")
+        if not content_hash or not content:
+            return False
+
+        now = time.time()
+        def _parse_ts(iso_str) -> float:
+            if not iso_str:
+                return now
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+                return dt.timestamp()
+            except Exception:
+                return now
+
+        created_at = _parse_ts(remote_note.get("created_at"))
+        updated_at = _parse_ts(remote_note.get("updated_at"))
+        title = remote_note.get("title") or ""
+        is_pinned = 1 if remote_note.get("is_pinned") else 0
+        color = remote_note.get("color")
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, updated_at FROM notes WHERE content_hash = ?", (content_hash,))
+            existing = cur.fetchone()
+
+            changed = False
+            if existing:
+                if updated_at > existing["updated_at"]:
+                    cur.execute(
+                        """UPDATE notes
+                           SET title = ?, content = ?, is_pinned = ?, color = ?, updated_at = ?
+                           WHERE id = ?""",
+                        (title, content, is_pinned, color, updated_at, existing["id"]),
+                    )
+                    changed = True
+            else:
+                cur.execute(
+                    """INSERT INTO notes (title, content, content_hash, is_pinned, color, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (title, content, content_hash, is_pinned, color, created_at, updated_at),
+                )
+                changed = True
+            conn.commit()
+            return changed
+
+    def delete_note_by_hash(self, content_hash: str) -> bool:
+        """Xóa ghi chú theo content_hash (khi máy khác xóa trên cloud)."""
+        if not content_hash:
+            return False
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM notes WHERE content_hash = ?", (content_hash,))
+            deleted = cur.rowcount > 0
+            conn.commit()
+            return deleted
+
