@@ -10,7 +10,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # App Info
         "app_title": "ClipMaster",
         "app_subtitle": "Lịch sử Clipboard (Win + V)",
-        "search_placeholder": "🔍 Tìm kiếm nội dung đã copy... (Ctrl+F)",
+        "search_placeholder": "Tìm kiếm nội dung đã copy... (Ctrl+F)",
 
         # Filter Tabs
         "filter_all": "🌟 Tất cả",
@@ -85,7 +85,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "toast_note_copied": "📋 Đã sao chép nội dung ghi chú",
         "filter_notes_all": "🌟 Tất cả",
         "filter_notes_pinned": "📌 Đã ghim",
-        "search_notes_placeholder": "🔍 Tìm kiếm trong ghi chú...",
+        "search_notes_placeholder": "Tìm kiếm trong ghi chú...",
 
         # Notes PIN Security
         "pin_lock_title": "🔒 Ghi chú được bảo vệ bằng mã PIN",
@@ -212,7 +212,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # App Info
         "app_title": "ClipMaster",
         "app_subtitle": "Clipboard History (Win + V)",
-        "search_placeholder": "🔍 Search copied history... (Ctrl+F)",
+        "search_placeholder": "Search copied history... (Ctrl+F)",
 
         # Filter Tabs
         "filter_all": "🌟 All",
@@ -287,7 +287,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "toast_note_copied": "📋 Note copied to clipboard",
         "filter_notes_all": "🌟 All",
         "filter_notes_pinned": "📌 Pinned",
-        "search_notes_placeholder": "🔍 Search notes...",
+        "search_notes_placeholder": "Search notes...",
 
         # Notes PIN Security
         "pin_lock_title": "🔒 Notes Protected by PIN",
