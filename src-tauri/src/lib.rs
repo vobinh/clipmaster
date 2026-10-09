@@ -27,6 +27,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_clips,
+            get_clip_image,
             copy_clip,
             copy_text,
             toggle_pin_clip,

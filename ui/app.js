@@ -41,7 +41,8 @@ const mockStore = {
     { id: 1, type: "code", content: "git checkout -b feature/rust-tauri\ngit push -u origin feature/rust-tauri", is_pinned: 1, created_at: Date.now() / 1000 - 120, updated_at: Date.now() / 1000 - 120 },
     { id: 2, type: "url", content: "https://tauri.app/v2/guides/getting-started/", is_pinned: 0, created_at: Date.now() / 1000 - 600, updated_at: Date.now() / 1000 - 600 },
     { id: 3, type: "color", content: "#3b82f6", is_pinned: 0, created_at: Date.now() / 1000 - 1800, updated_at: Date.now() / 1000 - 1800 },
-    { id: 4, type: "text", content: "ClipMaster - Trình quản lý Clipboard đa nền tảng tối ưu hiệu năng cao bằng Rust và Tauri v2.", is_pinned: 0, created_at: Date.now() / 1000 - 7200, updated_at: Date.now() / 1000 - 7200 }
+    { id: 4, type: "text", content: "ClipMaster - Trình quản lý Clipboard đa nền tảng tối ưu hiệu năng cao bằng Rust và Tauri v2.", is_pinned: 0, created_at: Date.now() / 1000 - 7200, updated_at: Date.now() / 1000 - 7200 },
+    { id: 5, type: "image", content: null, image_width: 320, image_height: 180, is_pinned: 0, created_at: Date.now() / 1000 - 300, updated_at: Date.now() / 1000 - 300 }
   ],
   notes: [
     { id: 1, title: "Lệnh build nhanh", content: "cargo tauri build\ncargo tauri dev", is_pinned: 1, color: "#3b82f6", created_at: Date.now() / 1000 - 3600, updated_at: Date.now() / 1000 - 3600 }
@@ -60,14 +61,19 @@ async function mockInvoke(cmd, args) {
   switch (cmd) {
     case 'get_clips': {
       let res = [...mockStore.clips];
-      if (args.filter_type === 'pinned') res = res.filter(c => c.is_pinned === 1);
-      else if (args.filter_type && args.filter_type !== 'all') res = res.filter(c => c.type === args.filter_type);
-      if (args.query) res = res.filter(c => c.content?.toLowerCase().includes(args.query.toLowerCase()));
+      const filter = args.filterType || args.filter_type || 'all';
+      if (filter === 'pinned') res = res.filter(c => c.is_pinned === 1);
+      else if (filter !== 'all') res = res.filter(c => c.type === filter);
+      if (args.query) res = res.filter(c => (c.content || "").toLowerCase().includes(args.query.toLowerCase()));
       return res.sort((a, b) => (b.is_pinned - a.is_pinned) || (b.updated_at - a.updated_at));
+    }
+    case 'get_clip_image': {
+      return "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180' viewBox='0 0 320 180'%3E%3Crect width='320' height='180' fill='%231e293b' rx='8'/%3E%3Ccircle cx='160' cy='75' r='28' fill='%236366f1'/%3E%3Cpath d='M146 75l10-10 10 10 14-14' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ctext x='160' y='130' fill='%2394a3b8' font-family='sans-serif' font-size='13' text-anchor='middle'%3EClipMaster Image (320 × 180)%3C/text%3E%3C/svg%3E";
     }
     case 'get_notes': {
       let res = [...mockStore.notes];
-      if (args.filter_pinned) res = res.filter(n => n.is_pinned === 1);
+      const filterPinned = args.filterPinned ?? args.filter_pinned;
+      if (filterPinned) res = res.filter(n => n.is_pinned === 1);
       if (args.query) res = res.filter(n => (n.title || "").toLowerCase().includes(args.query.toLowerCase()) || n.content.toLowerCase().includes(args.query.toLowerCase()));
       return res.sort((a, b) => (b.is_pinned - a.is_pinned) || (b.updated_at - a.updated_at));
     }
@@ -402,11 +408,38 @@ function showToast(message) {
 }
 
 // ── Data Loading & Rendering ───────────────────────────────────────
+const clipImageCache = new Map();
+
+async function loadCardImage(imgEl, id, placeholderEl) {
+  if (clipImageCache.has(id)) {
+    imgEl.src = clipImageCache.get(id);
+    imgEl.classList.remove('hidden');
+    if (placeholderEl) placeholderEl.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const dataUri = await invoke('get_clip_image', { id });
+    if (dataUri) {
+      clipImageCache.set(id, dataUri);
+      imgEl.src = dataUri;
+      imgEl.classList.remove('hidden');
+      if (placeholderEl) placeholderEl.classList.add('hidden');
+    }
+  } catch (err) {
+    console.error("Failed to load clip image:", id, err);
+    if (placeholderEl) {
+      placeholderEl.innerHTML = `<i class="ri-image-line"></i> <span>${t('image_load_failed')}</span>`;
+    }
+  }
+}
+
 async function loadClips() {
   if (state.mode !== 'history') return;
 
   try {
     const clips = await invoke('get_clips', {
+      filterType: state.historyFilter,
       filter_type: state.historyFilter,
       query: state.searchQuery,
       limit: 200,
@@ -446,6 +479,7 @@ async function loadNotes() {
   try {
     const notes = await invoke('get_notes', {
       query: state.searchQuery,
+      filterPinned: state.notesFilter === 'pinned',
       filter_pinned: state.notesFilter === 'pinned',
       limit: 200
     });
@@ -502,6 +536,23 @@ function renderHistoryCards(items) {
         </div>`;
     } else if (item.type === 'code') {
       previewHtml = `<div class="card-content code">${escapeHtml(item.content)}</div>`;
+    } else if (item.type === 'image') {
+      const dimensions = (item.image_width && item.image_height) 
+        ? `${item.image_width} × ${item.image_height} px` 
+        : 'Image';
+      const cached = clipImageCache.get(item.id);
+
+      previewHtml = `
+        <div class="card-image-wrapper">
+          <div class="image-loading-placeholder ${cached ? 'hidden' : ''}">
+            <i class="ri-loader-4-line"></i>
+            <span>${t('image_loading')}</span>
+          </div>
+          <img class="card-image-preview ${cached ? '' : 'hidden'}" src="${cached || ''}" alt="Image preview" loading="lazy" />
+          <div class="card-image-info">
+            <span><i class="ri-image-line"></i> ${dimensions}</span>
+          </div>
+        </div>`;
     } else {
       previewHtml = `<div class="card-content">${escapeHtml(item.content || "")}</div>`;
     }
@@ -521,6 +572,15 @@ function renderHistoryCards(items) {
         </button>
       </div>
     `;
+
+    // Lazy load image preview if not already cached
+    if (item.type === 'image') {
+      const imgEl = card.querySelector('.card-image-preview');
+      const placeholderEl = card.querySelector('.image-loading-placeholder');
+      if (imgEl && !clipImageCache.has(item.id)) {
+        loadCardImage(imgEl, item.id, placeholderEl);
+      }
+    }
 
     // Click on card body copies item
     card.addEventListener('click', async (e) => {
@@ -643,8 +703,13 @@ function selectCard(index) {
 
 async function copyItem(id) {
   try {
+    const item = state.currentItems.find(c => c.id === id);
     await invoke('copy_clip', { id });
-    showToast(t('toast_copied'));
+    if (item && item.type === 'image') {
+      showToast(t('toast_image_copied'));
+    } else {
+      showToast(t('toast_copied'));
+    }
   } catch (err) {
     console.error("Copy failed:", err);
   }
@@ -661,6 +726,7 @@ async function togglePinClip(id) {
 
 async function deleteClip(id) {
   try {
+    clipImageCache.delete(id);
     await invoke('delete_clip', { id });
     await loadClips();
   } catch (err) {

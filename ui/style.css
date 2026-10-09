@@ -479,6 +479,66 @@ body {
   border-left: 2px solid var(--accent);
 }
 
+/* Image Card Preview Styles */
+.card-image-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  overflow: hidden;
+  position: relative;
+}
+
+[data-theme="light"] .card-image-wrapper {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.card-image-preview {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.card-image-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  padding: 0 4px;
+}
+
+.image-loading-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.image-loading-placeholder i {
+  font-size: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .card-actions {
   display: flex;
   align-items: center;

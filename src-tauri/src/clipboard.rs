@@ -120,6 +120,53 @@ impl ClipboardManager {
         clip.set_text(text).map_err(|e| e.to_string())
     }
 
+    pub fn set_image_from_path(&self, img_path: &str, hash: &str) -> Result<(), String> {
+        let img = image::open(img_path)
+            .map_err(|e| format!("Không thể mở file ảnh: {}", e))?
+            .to_rgba8();
+        let width = img.width() as usize;
+        let height = img.height() as usize;
+        let raw_bytes = img.into_raw();
+
+        let img_data = arboard::ImageData {
+            width,
+            height,
+            bytes: std::borrow::Cow::Owned(raw_bytes),
+        };
+
+        let mut clip = Clipboard::new().map_err(|e| e.to_string())?;
+
+        // Update last_hash so listener doesn't immediately duplicate-record it
+        if let Ok(mut h) = self.last_hash.lock() {
+            *h = hash.to_string();
+        }
+
+        clip.set_image(img_data).map_err(|e| e.to_string())?;
+
+        #[cfg(target_os = "linux")]
+        {
+            use std::process::Command;
+            if std::env::var("WAYLAND_DISPLAY").is_ok() {
+                if let Ok(bytes) = std::fs::read(img_path) {
+                    use std::io::Write;
+                    if let Ok(mut child) = Command::new("wl-copy")
+                        .arg("-t")
+                        .arg("image/png")
+                        .stdin(std::process::Stdio::piped())
+                        .spawn()
+                    {
+                        if let Some(mut stdin) = child.stdin.take() {
+                            let _ = stdin.write_all(&bytes);
+                        }
+                        let _ = child.wait();
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn start_listener(
         &self,
         db: Arc<Database>,
@@ -147,6 +194,7 @@ impl ClipboardManager {
                     continue;
                 }
 
+                let mut captured_text = false;
                 let text_res = match &mut clip_res {
                     Ok(clip) => clip.get_text(),
                     Err(_) => {
@@ -172,6 +220,52 @@ impl ClipboardManager {
                             if let Ok(Some(saved)) = db.add_clip(c_type, Some(&text), None, 0, 0, &hash) {
                                 println!("[ClipMaster] 📋 Đã lưu clip mới: {} ký tự (loại: {})", text.len(), c_type);
                                 app_handle.emit("clipboard_changed", &saved).ok();
+                            }
+                        }
+                        captured_text = true;
+                    }
+                }
+
+                // If no text was captured, check for image
+                if !captured_text {
+                    let img_res = match &mut clip_res {
+                        Ok(clip) => clip.get_image(),
+                        Err(_) => continue,
+                    };
+
+                    if let Ok(img_data) = img_res {
+                        if img_data.width > 0 && img_data.height > 0 && !img_data.bytes.is_empty() {
+                            let hash = compute_sha256(&img_data.bytes);
+                            let mut last = last_hash_clone.lock().unwrap();
+
+                            if *last != hash {
+                                *last = hash.clone();
+                                drop(last);
+
+                                let hash_prefix = if hash.len() >= 16 { &hash[..16] } else { &hash };
+                                let img_filename = format!("img_{}.png", hash_prefix);
+                                let img_path = db.get_images_dir().join(&img_filename);
+
+                                if let Some(rgba_img) = image::RgbaImage::from_raw(
+                                    img_data.width as u32,
+                                    img_data.height as u32,
+                                    img_data.bytes.into_owned(),
+                                ) {
+                                    if rgba_img.save(&img_path).is_ok() {
+                                        let img_path_str = img_path.to_string_lossy().to_string();
+                                        if let Ok(Some(saved)) = db.add_clip(
+                                            "image",
+                                            None,
+                                            Some(&img_path_str),
+                                            img_data.width as i64,
+                                            img_data.height as i64,
+                                            &hash,
+                                        ) {
+                                            println!("[ClipMaster] 🖼️ Đã lưu hình ảnh mới: {}x{} ({})", img_data.width, img_data.height, img_filename);
+                                            app_handle.emit("clipboard_changed", &saved).ok();
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

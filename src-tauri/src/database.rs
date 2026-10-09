@@ -316,6 +316,11 @@ impl Database {
         }
     }
 
+    pub fn get_clip_by_id(&self, id: i64) -> Result<Option<ClipItem>> {
+        let conn = self.conn.lock().unwrap();
+        self.get_clip_by_id_locked(&conn, id)
+    }
+
     pub fn get_clips(
         &self,
         filter_type: &str,
@@ -342,8 +347,10 @@ impl Database {
 
         let trimmed_query = query.trim();
         if !trimmed_query.is_empty() {
-            sql.push_str(" AND content LIKE ?");
-            params_vec.push(Box::new(format!("%{}%", trimmed_query)));
+            sql.push_str(" AND (content LIKE ? OR (type = 'image' AND image_path LIKE ?))");
+            let pattern = format!("%{}%", trimmed_query);
+            params_vec.push(Box::new(pattern.clone()));
+            params_vec.push(Box::new(pattern));
         }
 
         sql.push_str(" ORDER BY is_pinned DESC, updated_at DESC LIMIT ? OFFSET ?");

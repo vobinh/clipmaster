@@ -28,21 +28,41 @@ pub fn get_clips(
 }
 
 #[tauri::command]
+pub fn get_clip_image(state: State<AppState>, id: i64) -> Result<String, String> {
+    let clip = state
+        .db
+        .get_clip_by_id(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Clip not found".to_string())?;
+
+    let path_str = clip.image_path.ok_or_else(|| "No image path".to_string())?;
+    let path = std::path::Path::new(&path_str);
+    if !path.exists() {
+        return Err("Image file not found".to_string());
+    }
+
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:image/png;base64,{}", b64))
+}
+
+#[tauri::command]
 pub fn copy_clip(
     state: State<AppState>,
     app_handle: AppHandle,
     id: i64,
 ) -> Result<(), String> {
-    let clips = state
+    let clip = state
         .db
-        .get_clips("all", "", 500, 0)
-        .map_err(|e| e.to_string())?;
+        .get_clip_by_id(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Clip not found".to_string())?;
 
-    if let Some(clip) = clips.into_iter().find(|c| c.id == id) {
-        if let Some(content) = clip.content {
-            state.clipboard.set_text(&content)?;
-            
-            // Check auto-paste setting: if enabled, optionally hide window
+    if clip.r#type == "image" {
+        if let Some(ref path_str) = clip.image_path {
+            state.clipboard.set_image_from_path(path_str, &clip.content_hash)?;
+
             let auto_paste = state.db.get_setting("auto_paste", "1") == "1";
             if auto_paste {
                 if let Some(window) = app_handle.get_webview_window("main") {
@@ -51,8 +71,19 @@ pub fn copy_clip(
             }
             return Ok(());
         }
+    } else if let Some(ref content) = clip.content {
+        state.clipboard.set_text(content)?;
+
+        let auto_paste = state.db.get_setting("auto_paste", "1") == "1";
+        if auto_paste {
+            if let Some(window) = app_handle.get_webview_window("main") {
+                window.hide().ok();
+            }
+        }
+        return Ok(());
     }
-    Err("Clip not found or has no text content".to_string())
+
+    Err("Clip content cannot be copied".to_string())
 }
 
 #[tauri::command]
