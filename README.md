@@ -69,7 +69,7 @@ Nếu bạn muốn tạo file cài đặt `.deb` để chia sẻ cho các máy k
 ```
 Sau đó cài đặt gói đã tạo:
 ```bash
-sudo apt install ./clipmaster_1.0.0_all.deb
+sudo apt install ./clipmaster_2.0.0_all.deb
 ```
 
 ---
@@ -82,13 +82,13 @@ Cấu hình Snap đã được tạo sẵn tại thư mục `snap/`:
   ```
 - **Cài đặt file `.snap` cục bộ:**
   ```bash
-  sudo snap install clipmaster_1.0.0_amd64.snap --dangerous
+  sudo snap install clipmaster_2.0.0_amd64.snap --dangerous
   ```
 - **Đăng ký và phát hành lên Snap Store:**
   ```bash
   snapcraft login
   snapcraft register clipmaster
-  snapcraft upload clipmaster_1.0.0_amd64.snap --release=stable
+  snapcraft upload clipmaster_2.0.0_amd64.snap --release=stable
   ```
 
 ---
@@ -304,7 +304,7 @@ If you want to package ClipMaster into a `.deb` installer to share with other ma
 ```
 Then install the generated package:
 ```bash
-sudo apt install ./clipmaster_1.0.0_all.deb
+sudo apt install ./clipmaster_2.0.0_all.deb
 ```
 
 ---
@@ -317,13 +317,13 @@ Snap configuration is pre-configured in the `snap/` directory:
   ```
 - **Install `.snap` package locally:**
   ```bash
-  sudo snap install clipmaster_1.0.0_amd64.snap --dangerous
+  sudo snap install clipmaster_2.0.0_amd64.snap --dangerous
   ```
 - **Register and publish to Snap Store:**
   ```bash
   snapcraft login
   snapcraft register clipmaster
-  snapcraft upload clipmaster_1.0.0_amd64.snap --release=stable
+  snapcraft upload clipmaster_2.0.0_amd64.snap --release=stable
   ```
 
 ---

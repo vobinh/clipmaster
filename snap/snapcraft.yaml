@@ -1,7 +1,7 @@
 name: clipmaster
 title: ClipMaster
 base: core22
-version: '1.0.0'
+version: '2.0.0'
 summary: Windows + V style Clipboard History Manager for Linux
 description: |
   ClipMaster is a modern, high-productivity clipboard history manager for Ubuntu

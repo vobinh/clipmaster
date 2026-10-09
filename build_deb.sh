@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_NAME="clipmaster"
-VERSION="1.0.0"
+VERSION="2.0.0"
 ARCH="all"
 DEB_DIR="$SCRIPT_DIR/build/deb_pkg"
 OUTPUT_DEB="$SCRIPT_DIR/${PKG_NAME}_${VERSION}_${ARCH}.deb"
@@ -26,12 +26,12 @@ mkdir -p "$DEB_DIR/usr/share/icons/hicolor/scalable/apps"
 mkdir -p "$DEB_DIR/usr/lib/systemd/user"
 
 # 2. Tạo file DEBIAN/control
-cat << 'EOF' > "$DEB_DIR/DEBIAN/control"
-Package: clipmaster
-Version: 1.0.0
+cat << EOF > "$DEB_DIR/DEBIAN/control"
+Package: $PKG_NAME
+Version: $VERSION
 Section: utils
 Priority: optional
-Architecture: all
+Architecture: $ARCH
 Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, xsel, xdotool
 Maintainer: Torin <support@clipmaster.local>
 Description: Modern Clipboard Manager for Ubuntu / Linux (Win+V style)
