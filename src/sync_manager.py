@@ -10,7 +10,7 @@ cài đặt thêm pip package (không cần `supabase` hay `requests`).
 
 Luồng hoạt động:
   1. User nhập Project URL + Anon Key → lưu vào sync_config.json (chmod 600)
-  2. Lần đầu: nhập PAT → app tự động tạo bảng qua Management API → PAT không lưu
+  2. Lần đầu: nhập PAT → app tự động tạo bảng + RLS policy qua Management API
   3. Mỗi khi app khởi động: kéo thay đổi từ cloud về local, đẩy local lên cloud
   4. Mỗi khi user ghim/bỏ ghim: tự động push lên cloud ngay lập tức
 """
@@ -26,7 +26,7 @@ from typing import Optional
 
 CONFIG_PATH = os.path.expanduser("~/.local/share/clipmaster/sync_config.json")
 
-# SQL schema tạo bảng — chạy 1 lần duy nhất qua Management API
+# SQL schema tạo bảng & cấu hình Row Level Security (RLS)
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS pinned_clips (
     id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -43,6 +43,22 @@ CREATE TABLE IF NOT EXISTS pinned_clips (
 CREATE INDEX IF NOT EXISTS idx_pinned_updated
     ON pinned_clips(updated_at DESC)
     WHERE deleted_at IS NULL;
+
+-- Kích hoạt RLS và tạo policy cho phép đọc/ghi với anon key
+ALTER TABLE pinned_clips ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'pinned_clips' AND policyname = 'allow_anon_all'
+    ) THEN
+        CREATE POLICY allow_anon_all ON pinned_clips
+            FOR ALL
+            TO anon, authenticated
+            USING (true)
+            WITH CHECK (true);
+    END IF;
+END $$;
 """
 
 
@@ -157,7 +173,7 @@ class SyncManager:
         creds: Optional[tuple[str, str]] = None,
         timeout: float = 15.0,
     ):
-        """Thực hiện HTTP request tới Supabase PostgREST endpoint."""
+        """Thực hiện HTTP request tới Supabase PostgREST endpoint với giải mã lỗi chi tiết."""
         if not creds:
             creds = self.config.load()
         if not creds:
@@ -179,17 +195,34 @@ class SyncManager:
         body_bytes = json.dumps(data).encode("utf-8") if data is not None else None
         req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method)
 
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            res_data = response.read().decode("utf-8")
-            if res_data:
-                return json.loads(res_data)
-            return None
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                res_data = response.read().decode("utf-8")
+                if res_data:
+                    return json.loads(res_data)
+                return None
+        except urllib.error.HTTPError as e:
+            try:
+                err_text = e.read().decode("utf-8", errors="ignore")
+                err_json = json.loads(err_text)
+                msg = err_json.get("message") or err_json.get("error") or err_text
+                code = str(err_json.get("code", ""))
+            except Exception:
+                msg = str(e)
+                code = ""
+
+            if code == "42501" or "row-level security" in msg.lower():
+                raise RuntimeError(
+                    "RLS_BLOCKED: Bảng pinned_clips bị chặn bởi Row-Level Security (RLS). "
+                    "Cần thêm policy cho phép anon key đọc/ghi."
+                )
+            raise RuntimeError(f"HTTP {e.code}: {msg}")
 
     # ── Setup: tự động tạo schema qua Management API ──
 
     def auto_setup_schema(self, url: str, pat: str) -> tuple[bool, str]:
         """
-        Gọi Supabase Management API để tự động tạo bảng pinned_clips.
+        Gọi Supabase Management API để tự động tạo bảng pinned_clips và RLS policy.
         PAT (Personal Access Token) chỉ dùng ở đây và KHÔNG được lưu lại.
 
         Args:
@@ -215,7 +248,7 @@ class SyncManager:
         try:
             with urllib.request.urlopen(req, timeout=20) as response:
                 if response.status in (200, 201):
-                    return True, "Đã tạo bảng thành công"
+                    return True, "Đã tạo bảng và cấu hình RLS thành công"
                 return True, "Đã khởi tạo database"
 
         except urllib.error.HTTPError as e:
@@ -242,43 +275,82 @@ class SyncManager:
 
     def test_connection(self, url: str, key: str) -> tuple[bool, str]:
         """
-        Kiểm tra URL + anon key có hợp lệ không qua PostgREST.
+        Kiểm tra URL + anon key:
+        1. Kiểm tra tồn tại bảng (GET)
+        2. Kiểm tra quyền ghi / RLS (POST probe row và dọn dẹp)
 
         Returns:
-            (True, "OK") nếu kết nối thành công và bảng tồn tại
-            (False, "TABLE_NOT_FOUND") nếu kết nối OK nhưng bảng chưa tạo
+            (True, "OK") nếu kết nối thành công và ghi được
+            (False, "TABLE_NOT_FOUND") nếu bảng chưa tạo
+            (False, "RLS_BLOCKED") nếu bảng có nhưng RLS chặn ghi
             (False, <lỗi>) nếu kết nối thất bại
         """
+        creds = (url.strip(), key.strip())
+
+        # 1. Kiểm tra tồn tại bảng
         try:
             self._rest_request(
                 method="GET",
                 path="/pinned_clips?select=id&limit=1",
-                creds=(url.strip(), key.strip()),
+                creds=creds,
                 timeout=10.0,
             )
-            return True, "OK"
-        except urllib.error.HTTPError as e:
-            status = e.code
-            try:
-                err_text = e.read().decode("utf-8", errors="ignore").lower()
-            except Exception:
-                err_text = ""
-
-            if status == 404 or ("relation" in err_text and "does not exist" in err_text):
-                return False, "TABLE_NOT_FOUND"
-            if status in (401, 403) or "jwt" in err_text or "invalid api key" in err_text:
-                return False, "API Key không hợp lệ"
-            if "relation" in err_text and "not exist" in err_text:
-                return False, "TABLE_NOT_FOUND"
-
-            return False, f"Lỗi HTTP {status}: {err_text[:100]}"
-        except urllib.error.URLError as e:
-            return False, "Không kết nối được. Kiểm tra URL và internet"
-        except Exception as e:
+        except RuntimeError as e:
             err = str(e).lower()
+            if "rls_blocked" in err:
+                return False, "RLS_BLOCKED"
             if "relation" in err and "does not exist" in err:
                 return False, "TABLE_NOT_FOUND"
+            if "404" in err:
+                return False, "TABLE_NOT_FOUND"
+            if "401" in err or "403" in err or "jwt" in err or "invalid api key" in err:
+                return False, "API Key không hợp lệ"
+            return False, str(e)[:120]
+        except urllib.error.URLError:
+            return False, "Không kết nối được. Kiểm tra URL và internet"
+        except Exception as e:
             return False, f"Lỗi: {str(e)[:120]}"
+
+        # 2. Kiểm tra quyền ghi (thử probe upsert)
+        probe_hash = "__clipmaster_probe__"
+        now = _now_iso()
+        probe_record = {
+            "content_hash": probe_hash,
+            "type": "probe",
+            "content": "probe",
+            "char_count": 0,
+            "line_count": 0,
+            "created_at": now,
+            "updated_at": now,
+            "deleted_at": now,
+        }
+        try:
+            self._rest_request(
+                method="POST",
+                path="/pinned_clips?on_conflict=content_hash",
+                data=probe_record,
+                extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                creds=creds,
+                timeout=10.0,
+            )
+            # Dọn dẹp probe row sau khi test thành công
+            try:
+                self._rest_request(
+                    method="DELETE",
+                    path=f"/pinned_clips?content_hash=eq.{probe_hash}",
+                    creds=creds,
+                    timeout=5.0,
+                )
+            except Exception:
+                pass
+            return True, "OK"
+        except RuntimeError as e:
+            err = str(e).lower()
+            if "rls_blocked" in err or "42501" in err:
+                return False, "RLS_BLOCKED"
+            return False, str(e)[:120]
+        except Exception as e:
+            return False, f"Lỗi kiểm tra ghi: {str(e)[:120]}"
 
     # ── Thao tác Push (Local → Cloud) ──────────
 
@@ -378,17 +450,26 @@ class SyncManager:
 
     # ── Sync tổng hợp ───────────────────────────
 
-    def sync_on_startup(self, on_done: Optional[callable] = None) -> None:
+    def sync_on_startup(self, on_done: Optional[callable] = None) -> tuple[bool, str]:
         """
-        Chạy đồng bộ đầy đủ khi app khởi động.
+        Chạy đồng bộ đầy đủ khi app khởi động hoặc khi bấm Sync Now.
         Nên gọi trong daemon thread để không block UI.
 
         1. Pull thay đổi từ cloud về local
         2. Push local pinned lên cloud (merge)
-        3. Cập nhật last_sync_at
+        3. Cập nhật last_sync_at (chỉ khi push thành công)
+
+        Trả về (success: bool, message: str).
         """
         if not self.is_configured():
-            return
+            if on_done:
+                on_done(False, "Chưa cấu hình Supabase")
+            return False, "Chưa cấu hình Supabase"
+
+        error_msg = ""
+        success = True
+        pulled = 0
+        pushed = 0
 
         try:
             last_sync = self.db.get_setting(
@@ -396,20 +477,21 @@ class SyncManager:
             )
 
             # 1. Pull changes từ cloud
-            changes = self.pull_changes_since(last_sync)
-            pulled = 0
-            for item in changes:
-                if item.get("deleted_at"):
-                    # Bỏ ghim local nếu cloud đã unpin
-                    self.db.unpin_by_hash(item["content_hash"])
-                else:
-                    # Thêm hoặc ghim mục từ cloud vào local
-                    self.db.pin_or_add_by_hash(item)
-                    pulled += 1
+            try:
+                changes = self.pull_changes_since(last_sync)
+                for item in changes:
+                    if item.get("deleted_at"):
+                        self.db.unpin_by_hash(item["content_hash"])
+                    else:
+                        self.db.pin_or_add_by_hash(item)
+                        pulled += 1
+            except Exception as e:
+                print(f"[Sync] pull error: {e}")
+                error_msg = str(e)
+                success = False
 
-            # 2. Push local pinned lên cloud (để máy khác nhận)
+            # 2. Push local pinned lên cloud
             local_pinned = self.db.get_pinned_for_sync()
-            pushed = 0
             if local_pinned:
                 records = [
                     {
@@ -434,21 +516,30 @@ class SyncManager:
                     pushed = len(records)
                 except Exception as e:
                     print(f"[Sync] batch push error: {e}")
+                    error_msg = str(e)
+                    success = False
 
-            # 3. Cập nhật thời gian sync cuối
-            self.db.set_setting("last_sync_at", _now_iso())
+            # 3. Chỉ cập nhật last_sync_at nếu không gặp lỗi nghiêm trọng
+            if success:
+                self.db.set_setting("last_sync_at", _now_iso())
+                msg = f"Đồng bộ thành công (↓{pulled}, ↑{pushed})"
+            else:
+                msg = f"Đồng bộ gặp lỗi: {error_msg}"
 
-            if pulled > 0 or pushed > 0:
-                print(f"[Sync] Startup sync: ↓{pulled} pulled, ↑{pushed} pushed")
+            print(f"[Sync] Kết quả: {msg}")
 
         except Exception as e:
-            print(f"[Sync] sync_on_startup error: {e}")
+            success = False
+            msg = f"Lỗi đồng bộ: {e}"
+            print(f"[Sync] {msg}")
         finally:
             if on_done:
                 try:
-                    on_done()
-                except Exception:
-                    pass
+                    on_done(success, msg)
+                except Exception as e:
+                    print(f"[Sync] on_done callback error: {e}")
+
+        return success, msg
 
     def run_startup_sync_async(self, on_done: Optional[callable] = None) -> None:
         """Chạy sync_on_startup trong daemon thread."""

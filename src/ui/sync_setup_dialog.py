@@ -284,12 +284,21 @@ class SyncSetupDialog(Adw.Window):
             self._set_step1_status("✅ Kết nối thành công!", error=False)
             self._finalize_connection()
 
-        elif msg == "TABLE_NOT_FOUND":
-            # Bảng chưa tồn tại → chuyển sang bước 2
-            self._set_step1_status(
-                "✅ Kết nối thành công! Cần khởi tạo database...",
-                error=False
-            )
+        elif msg in ("TABLE_NOT_FOUND", "RLS_BLOCKED"):
+            # Bảng chưa tồn tại hoặc bị chặn bởi RLS
+            if msg == "RLS_BLOCKED":
+                status_txt = (
+                    "⚠️ Bảng bị chặn ghi bởi Row Level Security (RLS). Cần cập nhật schema..."
+                    if self.lang == "vi"
+                    else "⚠️ Table writes blocked by Row Level Security (RLS). Schema update needed..."
+                )
+            else:
+                status_txt = (
+                    "✅ Kết nối thành công! Cần khởi tạo database..."
+                    if self.lang == "vi"
+                    else "✅ Connected! Database setup needed..."
+                )
+            self._set_step1_status(status_txt, error=False)
             GLib.timeout_add(600, lambda: self._stack.set_visible_child_name("step2") or False)
 
         else:

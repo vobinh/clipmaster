@@ -448,12 +448,25 @@ class SettingsDialog(Adw.PreferencesWindow):
             return
         self.sync_now_btn.set_sensitive(False)
 
-        def _done():
+        def _done(success: bool = True, msg: str = ""):
             from gi.repository import GLib
             def _ui():
                 self.sync_now_btn.set_sensitive(True)
-                toast = Adw.Toast(title=t("toast_sync_done", self.lang))
-                toast.set_timeout(2)
+                if success:
+                    title = t("toast_sync_done", self.lang)
+                    timeout = 2
+                else:
+                    if "RLS" in msg or "row-level security" in msg.lower():
+                        title = (
+                            "⚠️ Lỗi RLS: Supabase đang chặn ghi. Cần tạo Policy."
+                            if self.lang == "vi"
+                            else "⚠️ RLS Error: Supabase blocked writes. Policy needed."
+                        )
+                    else:
+                        title = f"❌ {msg[:60]}"
+                    timeout = 4
+                toast = Adw.Toast(title=title)
+                toast.set_timeout(timeout)
                 self.add_toast(toast)
                 self.on_settings_changed()
             GLib.idle_add(_ui)
