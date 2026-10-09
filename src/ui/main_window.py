@@ -65,7 +65,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _setup_window_properties(self):
         self.set_title("ClipMaster - Clipboard History (Win + V)")
-        self.set_default_size(460, 620)
+        self.set_default_size(520, 640)
         self.add_css_class("clipmaster-window")
 
         # Configure Icon theme so GTK can always find clipmaster icon
@@ -194,17 +194,35 @@ class MainWindow(Adw.ApplicationWindow):
         mode_box.append(mode_inner)
         main_box.append(mode_box)
 
-        # 2. Search Entry
-        self.search_entry = Gtk.SearchEntry()
-        self.search_entry.add_css_class("search-bar")
-        self._set_search_placeholder(t("search_placeholder", self.lang))
-        self.search_entry.connect("search-changed", self._on_search_changed)
-        main_box.append(self.search_entry)
+        # 2. Combined Search & Filter Bar (Stack)
+        self.search_filter_stack = Gtk.Stack()
+        self.search_filter_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.search_filter_stack.set_transition_duration(200)
+        self.search_filter_stack.add_css_class("search-filter-stack")
 
-        # 3. Category Filter Chips / Tabs (Cho chế độ Lịch sử)
-        self.filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        self.filter_box.add_css_class("filter-box")
-        self.filter_box.set_halign(Gtk.Align.CENTER)
+        # --- View 1: Filter Chips with Search Button at start ---
+        self.filter_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.filter_row.add_css_class("filter-row")
+        self.filter_row.set_halign(Gtk.Align.CENTER)
+
+        # Nút icon tìm kiếm ở đầu dòng
+        self.search_toggle_btn = Gtk.Button()
+        self.search_toggle_btn.set_icon_name("system-search-symbolic")
+        self.search_toggle_btn.add_css_class("filter-chip")
+        self.search_toggle_btn.add_css_class("search-toggle-chip")
+        self.search_toggle_btn.set_tooltip_text(t("tooltip_search", self.lang))
+        self.search_toggle_btn.connect("clicked", lambda _: self._expand_search())
+
+        # Focus controller để tự động mở rộng khi tab-focus tới nút search
+        search_focus_ctrl = Gtk.EventControllerFocus.new()
+        search_focus_ctrl.connect("enter", lambda _: self._expand_search())
+        self.search_toggle_btn.add_controller(search_focus_ctrl)
+
+        self.filter_row.append(self.search_toggle_btn)
+
+        # Hàng filter Lịch sử
+        self.filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.filter_box.add_css_class("filter-chips-inner")
 
         filters = [
             ("all", "filter_all"),
@@ -224,12 +242,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._filter_buttons[f_key] = (btn, f_trans_key)
             self.filter_box.append(btn)
 
-        main_box.append(self.filter_box)
+        self.filter_row.append(self.filter_box)
 
-        # 3b. Notes Filter Chips (Cho chế độ Ghi chú)
-        self.notes_filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        self.notes_filter_box.add_css_class("filter-box")
-        self.notes_filter_box.set_halign(Gtk.Align.CENTER)
+        # Hàng filter Ghi chú
+        self.notes_filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.notes_filter_box.add_css_class("filter-chips-inner")
         self.notes_filter_box.set_visible(False)
 
         notes_filters = [
@@ -246,7 +263,38 @@ class MainWindow(Adw.ApplicationWindow):
             self._notes_filter_buttons[nf_key] = (btn, nf_trans_key)
             self.notes_filter_box.append(btn)
 
-        main_box.append(self.notes_filter_box)
+        self.filter_row.append(self.notes_filter_box)
+
+        self.search_filter_stack.add_named(self.filter_row, "chips")
+
+        # --- View 2: Full Search Bar ---
+        self.search_bar_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.search_bar_box.add_css_class("search-bar-row")
+
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.add_css_class("search-bar")
+        self.search_entry.set_hexpand(True)
+        self._set_search_placeholder(t("search_placeholder", self.lang))
+        self.search_entry.connect("search-changed", self._on_search_changed)
+        self.search_entry.connect("stop-search", lambda _: self._collapse_search())
+
+        # Focus out controller: nếu rỗng mà blur thì tự thu gọn về filter
+        entry_focus_ctrl = Gtk.EventControllerFocus.new()
+        entry_focus_ctrl.connect("leave", self._on_search_focus_leave)
+        self.search_entry.add_controller(entry_focus_ctrl)
+
+        self.search_close_btn = Gtk.Button.new_from_icon_name("window-close-symbolic")
+        self.search_close_btn.add_css_class("filter-chip")
+        self.search_close_btn.add_css_class("search-close-chip")
+        self.search_close_btn.set_tooltip_text(t("btn_close_search", self.lang))
+        self.search_close_btn.connect("clicked", lambda _: self._collapse_search())
+
+        self.search_bar_box.append(self.search_entry)
+        self.search_bar_box.append(self.search_close_btn)
+
+        self.search_filter_stack.add_named(self.search_bar_box, "search")
+
+        main_box.append(self.search_filter_stack)
 
         # 4. History/Notes List in Scrolled Window
         scrolled = Gtk.ScrolledWindow()
@@ -380,14 +428,17 @@ class MainWindow(Adw.ApplicationWindow):
             # Chặn các phím khác khi đang ở màn hình khóa PIN
             return True
 
-        # Esc -> Hide window
+        # Esc -> Thu gọn thanh tìm kiếm nếu đang mở, hoặc ẩn cửa sổ
         if keyval == Gdk.KEY_Escape:
+            if self._is_search_expanded():
+                self._collapse_search()
+                return True
             self.hide()
             return True
 
-        # Ctrl+F -> Focus search bar
+        # Ctrl+F -> Mở rộng thanh tìm kiếm và focus ô nhập
         if (state & Gdk.ModifierType.CONTROL_MASK) and (keyval == Gdk.KEY_f or keyval == Gdk.KEY_F):
-            self.search_entry.grab_focus()
+            self._expand_search()
             return True
 
         # Ctrl+N -> Tạo ghi chú mới
@@ -437,11 +488,41 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_query = entry.get_text()
         self.reload_history()
 
+    def _expand_search(self):
+        if self.current_mode == "notes" and not self._is_notes_unlocked():
+            return
+        if hasattr(self, "search_filter_stack"):
+            self.search_filter_stack.set_visible_child_name("search")
+        if hasattr(self, "search_entry"):
+            self.search_entry.grab_focus()
+
+    def _collapse_search(self):
+        if hasattr(self, "search_entry"):
+            self.search_entry.set_text("")
+        if hasattr(self, "search_filter_stack"):
+            self.search_filter_stack.set_visible_child_name("chips")
+        self.reload_history()
+
+    def _is_search_expanded(self) -> bool:
+        if hasattr(self, "search_filter_stack"):
+            return self.search_filter_stack.get_visible_child_name() == "search"
+        return False
+
+    def _on_search_focus_leave(self, controller):
+        if hasattr(self, "search_entry") and not self.search_entry.get_text().strip():
+            GLib.idle_add(self._check_collapse_on_blur)
+
+    def _check_collapse_on_blur(self):
+        if hasattr(self, "search_entry") and not self.search_entry.has_focus() and not self.search_entry.get_text().strip():
+            self._collapse_search()
+        return False
+
     def _set_search_placeholder(self, text: str):
-        if hasattr(self.search_entry, "set_placeholder_text"):
-            self.search_entry.set_placeholder_text(text)
-        else:
-            self.search_entry.set_property("placeholder-text", text)
+        if hasattr(self, "search_entry"):
+            if hasattr(self.search_entry, "set_placeholder_text"):
+                self.search_entry.set_placeholder_text(text)
+            else:
+                self.search_entry.set_property("placeholder-text", text)
 
     def _update_localized_texts(self):
         """Update all static labels when language is changed."""
@@ -458,6 +539,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.mode_history_btn.set_label(t("tab_history", self.lang))
         self.mode_notes_btn.set_label(t("tab_notes", self.lang))
         self.empty_create_note_btn.set_label(t("btn_create_note", self.lang))
+
+        if hasattr(self, "search_toggle_btn"):
+            self.search_toggle_btn.set_tooltip_text(t("tooltip_search", self.lang))
+        if hasattr(self, "search_close_btn"):
+            self.search_close_btn.set_tooltip_text(t("btn_close_search", self.lang))
 
         self.pause_lbl.set_text(t("pause_banner_text", self.lang))
         self.resume_btn.set_label(t("pause_banner_resume", self.lang))
@@ -763,8 +849,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_mode == "notes":
             # Kiểm tra bảo mật PIN nếu đã bật
             if not self._is_notes_unlocked():
-                self.search_entry.set_visible(False)
-                self.notes_filter_box.set_visible(False)
+                if hasattr(self, "search_filter_stack"):
+                    self.search_filter_stack.set_visible(False)
                 self.fab_create_note.set_visible(False)
                 self.create_note_btn.set_visible(False)
                 self.empty_create_note_btn.set_visible(False)
@@ -784,8 +870,10 @@ class MainWindow(Adw.ApplicationWindow):
                 self._update_record_status_ui()
                 return
 
-            self.search_entry.set_visible(True)
+            if hasattr(self, "search_filter_stack"):
+                self.search_filter_stack.set_visible(True)
             self.notes_filter_box.set_visible(True)
+            self.filter_box.set_visible(False)
             self.fab_create_note.set_visible(True)
             self.create_note_btn.set_visible(False)
 
@@ -828,6 +916,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         else:
             # Chế độ Clipboard History
+            if hasattr(self, "search_filter_stack"):
+                self.search_filter_stack.set_visible(True)
+            self.filter_box.set_visible(True)
+            self.notes_filter_box.set_visible(False)
             self.fab_create_note.set_visible(False)
             self.create_note_btn.set_visible(False)
             try:
@@ -917,7 +1009,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.fab_create_note.set_visible(False)
             self.filter_box.set_visible(True)
             self.notes_filter_box.set_visible(False)
-            self.search_entry.set_visible(True)
+            if hasattr(self, "search_filter_stack"):
+                self.search_filter_stack.set_visible(True)
             self._pin_buffer = ""
             self._update_pin_dots()
             self._set_search_placeholder(t("search_placeholder", self.lang))
@@ -927,8 +1020,10 @@ class MainWindow(Adw.ApplicationWindow):
             self.clear_btn.set_visible(False)
             self.create_note_btn.set_visible(False)
             self.filter_box.set_visible(False)
+            self.notes_filter_box.set_visible(True)
             self._set_search_placeholder(t("search_notes_placeholder", self.lang))
 
+        self._collapse_search()
         self.reload_history()
 
     def _make_notes_filter_handler(self, filter_key: str):
@@ -1063,7 +1158,8 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self.reload_history()
             self.present()
-            self.search_entry.grab_focus()
+            self._collapse_search()
+            self.list_box.grab_focus()
 
             # Tự động đồng bộ ngầm khi mở cửa sổ (chống spam phím Win+V với debounce/throttling 30s)
             if self.sync_mgr:

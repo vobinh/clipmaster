@@ -40,6 +40,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tooltip_record_off": "Tự động ghi nhớ: Đang TẮT (Bấm để bật lại)",
         "tooltip_theme_dark": "Giao diện: Tối (Bấm để chuyển sang Sáng)",
         "tooltip_theme_light": "Giao diện: Sáng (Bấm để chuyển sang Tối)",
+        "tooltip_search": "Tìm kiếm (Ctrl+F)",
+        "btn_close_search": "Đóng tìm kiếm (Esc)",
 
         # Empty State
         "empty_title": "Chưa có nội dung sao chép nào",
@@ -242,6 +244,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "tooltip_record_off": "Auto-record: OFF (Click to resume)",
         "tooltip_theme_dark": "Theme: Dark (Click to switch to Light mode)",
         "tooltip_theme_light": "Theme: Light (Click to switch to Dark mode)",
+        "tooltip_search": "Search (Ctrl+F)",
+        "btn_close_search": "Close search (Esc)",
 
         # Empty State
         "empty_title": "No clipboard history yet",
