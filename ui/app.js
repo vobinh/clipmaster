@@ -844,6 +844,7 @@ function setupSearchAndFilters() {
     chip.addEventListener('click', () => {
       DOM.historyFilters.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
+      chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       state.historyFilter = chip.dataset.filter;
       loadClips();
     });
@@ -854,10 +855,22 @@ function setupSearchAndFilters() {
     chip.addEventListener('click', () => {
       DOM.notesFilters.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
+      chip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       state.notesFilter = chip.dataset.filter;
       loadNotes();
     });
   });
+
+  // Smooth horizontal mouse-wheel scrolling for Filter Chips
+  const filterChipsScroll = document.getElementById('filter-chips-container');
+  if (filterChipsScroll) {
+    filterChipsScroll.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        filterChipsScroll.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+  }
 }
 
 function triggerReload() {
@@ -1358,12 +1371,21 @@ function setupSettingsModal() {
       if (!btn) return;
       navTabs.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 
       const tabId = btn.dataset.tab;
       document.querySelectorAll('[id^="tab-pane-"]').forEach(pane => pane.classList.add('hidden'));
       const activePane = document.getElementById(`tab-pane-${tabId}`);
       if (activePane) activePane.classList.remove('hidden');
     });
+
+    // Smooth horizontal mouse-wheel scrolling for Settings Nav Tabs
+    navTabs.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        navTabs.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
   }
 
   // Theme switch inside settings immediately reflects
