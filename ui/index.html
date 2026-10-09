@@ -759,10 +759,11 @@
             <div class="wizard-actions-row">
               <button class="btn-secondary" id="btn-wizard-open-dashboard">
                 <i class="ri-external-link-line"></i>
-                <span data-i18n="wizard_btn_open_dashboard">🌐 Mở Dashboard</span>
+                <span data-i18n="wizard_btn_open_dashboard">Mở Dashboard</span>
               </button>
               <button class="btn-primary" id="btn-wizard-step1-next">
-                <span id="wizard-step1-btn-text" data-i18n="wizard_btn_test_next">Kiểm tra kết nối →</span>
+                <span id="wizard-step1-btn-text" data-i18n="wizard_btn_test_next">Kiểm tra kết nối</span>
+                <i class="ri-arrow-right-line" style="margin-left: 4px;"></i>
               </button>
             </div>
           </div>
@@ -776,7 +777,10 @@
               </div>
               <p class="wizard-guide-text" data-i18n="wizard_step_2_desc">Cần tạo bảng dữ liệu trên Supabase project của bạn.</p>
               <div class="wizard-guide-sub" data-i18n="wizard_step_2_sub">Nhập Personal Access Token (PAT) để ứng dụng tự động thực hiện.</div>
-              <div class="wizard-guide-warning" data-i18n="wizard_step_2_warning">⚠️ PAT chỉ dùng 1 lần để cấu hình và tuyệt đối không được lưu lại.</div>
+              <div class="wizard-guide-warning">
+                <i class="ri-error-warning-line" style="margin-right: 3px;"></i>
+                <span data-i18n="wizard_step_2_warning">Token PAT chỉ dùng 1 lần để cấu hình và tuyệt đối không được lưu lại.</span>
+              </div>
             </div>
 
             <div class="form-group" style="margin-top: 14px;">
@@ -797,16 +801,16 @@
             <div class="wizard-actions-row">
               <button class="btn-secondary" id="btn-wizard-step2-back">
                 <i class="ri-arrow-left-line"></i>
-                <span data-i18n="wizard_btn_back">← Quay lại</span>
+                <span data-i18n="wizard_btn_back">Quay lại</span>
               </button>
               <div style="display: flex; gap: 8px;">
                 <button class="btn-secondary" id="btn-wizard-open-pat-guide">
                   <i class="ri-book-open-line"></i>
-                  <span data-i18n="wizard_btn_pat_guide">📖 Hướng dẫn lấy PAT</span>
+                  <span data-i18n="wizard_btn_pat_guide">Hướng dẫn lấy PAT</span>
                 </button>
                 <button class="btn-primary" id="btn-wizard-step2-setup">
                   <i class="ri-magic-line"></i>
-                  <span id="wizard-step2-btn-text" data-i18n="wizard_btn_auto_setup">✨ Tự động thiết lập</span>
+                  <span id="wizard-step2-btn-text" data-i18n="wizard_btn_auto_setup">Tự động thiết lập</span>
                 </button>
               </div>
             </div>

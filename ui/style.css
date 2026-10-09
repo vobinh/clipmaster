@@ -562,6 +562,11 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
 .card-actions {
   display: flex;
   align-items: center;

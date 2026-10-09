@@ -1668,13 +1668,31 @@ function setupSyncWizard() {
   function setStep1Status(text, type = '') {
     if (!step1Status) return;
     step1Status.className = 'wizard-status-msg' + (type ? ' ' + type : '');
-    step1Status.textContent = text;
+    if (!text) {
+      step1Status.innerHTML = '';
+      return;
+    }
+    let iconHtml = '';
+    if (type === 'loading') iconHtml = '<i class="ri-loader-4-line spin" style="margin-right: 5px; vertical-align: -1px;"></i>';
+    else if (type === 'success') iconHtml = '<i class="ri-checkbox-circle-fill" style="margin-right: 5px; vertical-align: -1px;"></i>';
+    else if (type === 'error') iconHtml = '<i class="ri-error-warning-fill" style="margin-right: 5px; vertical-align: -1px;"></i>';
+
+    step1Status.innerHTML = iconHtml + escapeHtml(text);
   }
 
   function setStep2Status(text, type = '') {
     if (!step2Status) return;
     step2Status.className = 'wizard-status-msg' + (type ? ' ' + type : '');
-    step2Status.textContent = text;
+    if (!text) {
+      step2Status.innerHTML = '';
+      return;
+    }
+    let iconHtml = '';
+    if (type === 'loading') iconHtml = '<i class="ri-loader-4-line spin" style="margin-right: 5px; vertical-align: -1px;"></i>';
+    else if (type === 'success') iconHtml = '<i class="ri-checkbox-circle-fill" style="margin-right: 5px; vertical-align: -1px;"></i>';
+    else if (type === 'error') iconHtml = '<i class="ri-error-warning-fill" style="margin-right: 5px; vertical-align: -1px;"></i>';
+
+    step2Status.innerHTML = iconHtml + escapeHtml(text);
   }
 
   function openSyncWizard() {
@@ -1734,18 +1752,18 @@ function setupSyncWizard() {
       const key = inputKey?.value.trim() || '';
 
       if (!url || !key) {
-        setStep1Status(t('wizard_err_missing_info', '⚠️ Vui lòng nhập đầy đủ URL và Anon API Key.'), 'error');
+        setStep1Status(t('wizard_err_missing_info', 'Vui lòng nhập đầy đủ URL và Anon API Key.'), 'error');
         return;
       }
 
-      setStep1Status(t('wizard_testing', '🔄 Đang kiểm tra kết nối...'), 'loading');
+      setStep1Status(t('wizard_testing', 'Đang kiểm tra kết nối...'), 'loading');
       btnStep1Next.disabled = true;
 
       try {
         await invoke('test_sync_connection', { url, key });
 
         // Both tables exist and write test passed!
-        setStep1Status(t('wizard_test_ok', '✅ Kết nối thành công!'), 'success');
+        setStep1Status(t('wizard_test_ok', 'Kết nối thành công!'), 'success');
 
         await finalizeSyncConnection(url, key);
 
@@ -1759,9 +1777,9 @@ function setupSyncWizard() {
 
         if (errMsg.includes('TABLE_NOT_FOUND') || errMsg.includes('RLS_BLOCKED')) {
           if (errMsg.includes('RLS_BLOCKED')) {
-            setStep1Status(t('wizard_rls_blocked', '⚠️ Bảng bị chặn ghi bởi Row Level Security (RLS). Cần cập nhật schema...'), 'error');
+            setStep1Status(t('wizard_rls_blocked', 'Bảng bị chặn ghi bởi Row Level Security (RLS). Cần cập nhật schema...'), 'error');
           } else {
-            setStep1Status(t('wizard_need_db', '✅ Kết nối thành công! Cần khởi tạo database...'), 'success');
+            setStep1Status(t('wizard_need_db', 'Kết nối thành công! Cần khởi tạo database...'), 'success');
           }
 
           // Auto-advance to Step 2 (Database Setup) after 600ms
@@ -1770,7 +1788,7 @@ function setupSyncWizard() {
             setTimeout(() => inputPat?.focus(), 60);
           }, 600);
         } else {
-          setStep1Status('❌ ' + (errMsg.replace(/^Error:\s*/, '') || 'Lỗi kiểm tra kết nối'), 'error');
+          setStep1Status(errMsg.replace(/^Error:\s*/, '') || 'Lỗi kiểm tra kết nối', 'error');
         }
       }
     });
@@ -1792,17 +1810,17 @@ function setupSyncWizard() {
       const pat = inputPat?.value.trim() || '';
 
       if (!pat) {
-        setStep2Status(t('wizard_err_missing_pat', '⚠️ Vui lòng nhập Personal Access Token (PAT).'), 'error');
+        setStep2Status(t('wizard_err_missing_pat', 'Vui lòng nhập Personal Access Token (PAT).'), 'error');
         return;
       }
 
-      setStep2Status(t('wizard_creating_db', '🔄 Đang tạo bảng dữ liệu...'), 'loading');
+      setStep2Status(t('wizard_creating_db', 'Đang tạo bảng dữ liệu...'), 'loading');
       btnStep2Setup.disabled = true;
 
       try {
         await invoke('auto_setup_sync_schema', { url, pat });
 
-        setStep2Status(t('wizard_create_ok', '✅ Bảng đã được tạo thành công!'), 'success');
+        setStep2Status(t('wizard_create_ok', 'Bảng đã được tạo thành công!'), 'success');
         if (inputPat) inputPat.value = ''; // Discard PAT immediately
 
         await finalizeSyncConnection(url, key);
@@ -1814,7 +1832,7 @@ function setupSyncWizard() {
       } catch (err) {
         btnStep2Setup.disabled = false;
         const errMsg = err?.toString() || 'Lỗi khởi tạo bảng';
-        setStep2Status('❌ ' + errMsg.replace(/^Error:\s*/, ''), 'error');
+        setStep2Status(errMsg.replace(/^Error:\s*/, ''), 'error');
       }
     });
   }
@@ -1833,7 +1851,7 @@ function setupSyncWizard() {
     if (settingUrl) settingUrl.value = url;
     if (settingToken) settingToken.value = key;
     if (syncStatusText) {
-      syncStatusText.textContent = "✅ Đã kết nối Supabase BYOS: " + url;
+      syncStatusText.innerHTML = '<i class="ri-checkbox-circle-fill" style="color: #10b981; margin-right: 4px;"></i> <span>' + escapeHtml("Đã kết nối Supabase BYOS: " + url) + '</span>';
     }
 
     // Switch to configured view
