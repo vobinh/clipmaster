@@ -1170,13 +1170,27 @@ async function openSettingsModal() {
   if (elSyncDirection) elSyncDirection.value = syncDirection;
 
   const lastSyncAt = parseFloat(settings.last_sync_at || '0');
-  const syncStatusText = document.getElementById('sync-status-text');
-  if (syncStatusText) {
-    if (lastSyncAt > 0) {
-      syncStatusText.textContent = `Lần đồng bộ gần nhất: ${formatDate(lastSyncAt)}`;
-    } else {
-      syncStatusText.textContent = 'Mô hình BYOS: Nhập URL + API Key rồi bấm "Kiểm tra kết nối" hoặc "Đồng bộ ngay".';
+  updateSyncTabViews(syncUrl, syncToggle, lastSyncAt);
+}
+
+function updateSyncTabViews(syncUrl, syncEnabled, lastSyncAt = 0) {
+  const unconfiguredView = document.getElementById('sync-unconfigured-view');
+  const configuredView = document.getElementById('sync-configured-view');
+  const urlValEl = document.getElementById('sync-info-url-val');
+  const lastValEl = document.getElementById('sync-info-last-val');
+  const syncToggle = document.getElementById('setting-sync-toggle');
+
+  const isConfigured = Boolean(syncUrl && syncUrl.trim() && syncEnabled);
+
+  if (unconfiguredView) unconfiguredView.classList.toggle('hidden', isConfigured);
+  if (configuredView) configuredView.classList.toggle('hidden', !isConfigured);
+
+  if (isConfigured) {
+    if (urlValEl) urlValEl.textContent = syncUrl;
+    if (lastValEl) {
+      lastValEl.textContent = lastSyncAt > 0 ? formatDate(lastSyncAt) : t('time_just_now', 'Vừa xong');
     }
+    if (syncToggle) syncToggle.checked = true;
   }
 }
 
@@ -1479,51 +1493,20 @@ function setupSettingsModal() {
     });
   }
 
+
   // Test Sync Connection
   const btnTestSync = document.getElementById('btn-test-sync');
   if (btnTestSync) {
     btnTestSync.addEventListener('click', async () => {
-      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
-      const syncToken = document.getElementById('setting-sync-token')?.value.trim() || '';
-      await invoke('set_setting', { key: 'sync_url', value: syncUrl });
-      await invoke('set_setting', { key: 'sync_token', value: syncToken });
-
       const statusText = document.getElementById('sync-status-text');
       if (statusText) statusText.textContent = "Đang kiểm tra kết nối máy chủ Supabase...";
 
       try {
-        const msg = await invoke('test_sync_connection', { url: syncUrl, key: syncToken });
+        const msg = await invoke('test_sync_connection');
         showToast(msg);
         if (statusText) statusText.textContent = msg;
       } catch (err) {
         const errMsg = err?.toString() || "Lỗi kiểm tra kết nối";
-        showToast(errMsg, 'error');
-        if (statusText) statusText.textContent = errMsg;
-      }
-    });
-  }
-
-  // Auto Setup Sync Schema via PAT
-  const btnAutoSetupSync = document.getElementById('btn-auto-setup-sync');
-  if (btnAutoSetupSync) {
-    btnAutoSetupSync.addEventListener('click', async () => {
-      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
-      if (!syncUrl) {
-        showToast("Vui lòng nhập Supabase Project URL trước!", 'error');
-        return;
-      }
-      const pat = window.prompt("Nhập Personal Access Token (PAT) từ Supabase để tự động tạo bảng:\n(Lấy tại: https://supabase.com/dashboard/account/tokens)");
-      if (!pat || !pat.trim()) return;
-
-      const statusText = document.getElementById('sync-status-text');
-      if (statusText) statusText.textContent = "Đang tự động khởi tạo bảng 'pinned_clips' và 'user_notes'...";
-
-      try {
-        const msg = await invoke('auto_setup_sync_schema', { url: syncUrl, pat: pat.trim() });
-        showToast(msg);
-        if (statusText) statusText.textContent = msg;
-      } catch (err) {
-        const errMsg = err?.toString() || "Lỗi khởi tạo bảng";
         showToast(errMsg, 'error');
         if (statusText) statusText.textContent = errMsg;
       }
@@ -1535,14 +1518,10 @@ function setupSettingsModal() {
   if (btnSyncNow) {
     btnSyncNow.addEventListener('click', async () => {
       const syncToggle = document.getElementById('setting-sync-toggle');
-      const syncUrl = document.getElementById('setting-sync-url')?.value.trim() || '';
-      const syncToken = document.getElementById('setting-sync-token')?.value.trim() || '';
       const syncDirection = document.getElementById('setting-sync-direction')?.value || 'bidirectional';
 
       if (syncToggle) syncToggle.checked = true;
       await invoke('set_setting', { key: 'sync_enabled', value: '1' });
-      await invoke('set_setting', { key: 'sync_url', value: syncUrl });
-      await invoke('set_setting', { key: 'sync_token', value: syncToken });
       await invoke('set_setting', { key: 'sync_direction', value: syncDirection });
 
       const statusText = document.getElementById('sync-status-text');
@@ -1552,6 +1531,8 @@ function setupSettingsModal() {
         const msg = await invoke('sync_now');
         showToast(msg);
         if (statusText) statusText.textContent = msg;
+        const lastValEl = document.getElementById('sync-info-last-val');
+        if (lastValEl) lastValEl.textContent = t('time_just_now', 'Vừa xong');
         await loadClips();
         if (state.mode === 'notes') await loadNotes();
       } catch (err) {
@@ -1855,6 +1836,9 @@ function setupSyncWizard() {
       syncStatusText.textContent = "✅ Đã kết nối Supabase BYOS: " + url;
     }
 
+    // Switch to configured view
+    updateSyncTabViews(url, true, Date.now() / 1000);
+
     // Trigger background initial sync
     try {
       invoke('sync_now').then(async () => {
@@ -1870,6 +1854,38 @@ function setupSyncWizard() {
     const doneUrlEl = document.getElementById('wizard-done-project-url');
     if (doneUrlEl) doneUrlEl.textContent = url;
     setStep(3);
+  }
+
+  // Reconfigure sync button
+  const btnReconfigure = document.getElementById('btn-reconfigure-sync');
+  if (btnReconfigure) {
+    btnReconfigure.addEventListener('click', openSyncWizard);
+  }
+
+  // Disconnect sync button
+  const btnDisconnect = document.getElementById('btn-disconnect-sync');
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', () => {
+      showConfirmDialog({
+        title: t('btn_disconnect_sync', 'Ngắt kết nối'),
+        message: t('confirm_disconnect_sync', 'Bạn có chắc chắn muốn ngắt kết nối đồng bộ đám mây? Dữ liệu cục bộ trên máy vẫn sẽ được giữ nguyên.'),
+        onConfirm: async () => {
+          await invoke('set_setting', { key: 'sync_enabled', value: '0' });
+          await invoke('set_setting', { key: 'sync_url', value: '' });
+          await invoke('set_setting', { key: 'sync_token', value: '' });
+
+          const elSyncUrl = document.getElementById('setting-sync-url');
+          const elSyncToken = document.getElementById('setting-sync-token');
+          if (elSyncUrl) elSyncUrl.value = '';
+          if (elSyncToken) elSyncToken.value = '';
+          if (inputUrl) inputUrl.value = '';
+          if (inputKey) inputKey.value = '';
+
+          updateSyncTabViews('', false, 0);
+          showToast(t('toast_sync_disconnected', 'Đã ngắt kết nối đồng bộ đám mây!'));
+        }
+      });
+    });
   }
 
   if (btnFinish) {

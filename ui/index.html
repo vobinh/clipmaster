@@ -418,79 +418,107 @@
         <div class="settings-content-body hidden" id="tab-pane-sync">
           <div class="settings-section-title" data-i18n="sec_sync">Đồng bộ đám mây (BYOS)</div>
 
-          <!-- Quick 2-Step Setup Banner -->
-          <div class="sync-banner-card">
-            <div class="sync-banner-icon">
+          <!-- State 1: Chưa thiết lập (Unconfigured View - shown when not set up) -->
+          <div id="sync-unconfigured-view" class="sync-empty-state-card">
+            <div class="sync-empty-icon-wrap">
+              <i class="ri-cloud-line"></i>
+            </div>
+            <h4 class="sync-empty-title" data-i18n="sync_empty_title">Đồng bộ đám mây chưa được thiết lập</h4>
+            <p class="sync-empty-desc" data-i18n="sync_empty_desc">
+              Kết nối với tài khoản Supabase cá nhân theo mô hình BYOS để tự động sao lưu và đồng bộ lịch sử clipboard, ghi chú giữa các thiết bị.
+            </p>
+            <div class="sync-empty-features">
+              <div class="sync-feature-item">
+                <i class="ri-shield-check-line"></i>
+                <span data-i18n="sync_feature_privacy">Bảo mật 100% trên dự án cá nhân</span>
+              </div>
+              <div class="sync-feature-item">
+                <i class="ri-flashlight-line"></i>
+                <span data-i18n="sync_feature_speed">Đồng bộ tức thời 2 chiều</span>
+              </div>
+              <div class="sync-feature-item">
+                <i class="ri-magic-line"></i>
+                <span data-i18n="sync_feature_auto">Tự động khởi tạo database</span>
+              </div>
+            </div>
+            <button class="btn-primary sync-start-btn" id="btn-open-sync-wizard">
               <i class="ri-sparkling-fill"></i>
-            </div>
-            <div class="sync-banner-content">
-              <h4 class="sync-banner-title" data-i18n="sync_banner_title">Thiết lập đồng bộ nhanh qua 2 bước</h4>
-              <p class="sync-banner-desc" data-i18n="sync_banner_desc">
-                Hướng dẫn từng bước kết nối tài khoản Supabase cá nhân (BYOS) và tự động tạo cơ sở dữ liệu.
-              </p>
-            </div>
-            <button class="btn-primary" id="btn-open-sync-wizard">
-              <i class="ri-magic-line"></i>
-              <span data-i18n="btn_start_wizard">Bắt đầu thiết lập</span>
+              <span data-i18n="btn_start_wizard_cta">Bắt đầu thiết lập (2 bước)</span>
             </button>
           </div>
 
-          <div class="settings-row">
-            <div class="settings-row-info">
-              <span class="settings-row-title" data-i18n="row_sync_enable">Bật đồng bộ đám mây</span>
-              <span class="settings-row-desc" data-i18n="row_sync_enable_desc">Đồng bộ các mục ghim và ghi chú giữa các thiết bị</span>
+          <!-- State 2: Đã thiết lập (Configured View - shown ONLY when setup is complete) -->
+          <div id="sync-configured-view" class="hidden">
+            <!-- Hidden inputs to maintain compatibility with settings save -->
+            <input type="hidden" id="setting-sync-url" value="" />
+            <input type="hidden" id="setting-sync-token" value="" />
+
+            <!-- Status Card -->
+            <div class="sync-status-card">
+              <div class="sync-status-header">
+                <div class="sync-status-badge active" id="sync-active-badge">
+                  <span class="status-dot"></span>
+                  <span id="sync-status-label" data-i18n="sync_status_connected">Đang hoạt động & Đã kết nối</span>
+                </div>
+                <button class="btn-secondary" id="btn-reconfigure-sync" style="padding: 5px 12px; font-size: 11.5px;">
+                  <i class="ri-settings-4-line"></i>
+                  <span data-i18n="btn_reconfigure_sync">Thiết lập lại</span>
+                </button>
+              </div>
+              <div class="sync-info-row">
+                <span class="sync-info-label" data-i18n="sync_info_url">Máy chủ Supabase:</span>
+                <span class="sync-info-value" id="sync-info-url-val">-</span>
+              </div>
+              <div class="sync-info-row">
+                <span class="sync-info-label" data-i18n="sync_info_last">Lần đồng bộ gần nhất:</span>
+                <span class="sync-info-value" id="sync-info-last-val" data-i18n="time_just_now">Vừa xong</span>
+              </div>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="setting-sync-toggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
 
-          <div class="form-group">
-            <label class="form-label" data-i18n="sync_url_label">URL Dự án Supabase (Project URL)</label>
-            <input type="text" class="form-input" id="setting-sync-url" placeholder="https://xyzproject.supabase.co" autocomplete="off" />
-          </div>
+            <div class="settings-row" style="margin-top: 14px;">
+              <div class="settings-row-info">
+                <span class="settings-row-title" data-i18n="row_sync_enable">Bật đồng bộ đám mây</span>
+                <span class="settings-row-desc" data-i18n="row_sync_enable_desc">Tự động đồng bộ các mục ghim và ghi chú</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-sync-toggle" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label" data-i18n="sync_token_label">Khóa API công khai (anon public key)</label>
-            <div class="pin-input-peek-wrapper">
-              <input type="password" class="form-input" id="setting-sync-token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." autocomplete="off" />
-              <button type="button" class="btn-peek" data-target="setting-sync-token" title="Hiện/ẩn API Key">
-                <i class="ri-eye-line"></i>
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <span class="settings-row-title" data-i18n="row_sync_direction">Hướng đồng bộ</span>
+                <span class="settings-row-desc" data-i18n="row_sync_direction_desc">Quy tắc trao đổi dữ liệu</span>
+              </div>
+              <select class="settings-select" id="setting-sync-direction">
+                <option value="bidirectional" data-i18n="sync_dir_both">Hai chiều (Tải lên & Tải về)</option>
+                <option value="push_only" data-i18n="sync_dir_push">Chỉ tải lên máy chủ</option>
+                <option value="pull_only" data-i18n="sync_dir_pull">Chỉ tải về từ máy chủ</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap;">
+              <button class="btn-danger-outline" id="btn-disconnect-sync" style="font-size: 11.5px; padding: 7px 12px;">
+                <i class="ri-link-unlink-m"></i>
+                <span data-i18n="btn_disconnect_sync">Ngắt kết nối</span>
               </button>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-secondary" id="btn-test-sync">
+                  <i class="ri-wifi-line"></i>
+                  <span data-i18n="btn_test_sync">Kiểm tra kết nối</span>
+                </button>
+                <button class="btn-primary" id="btn-sync-now">
+                  <i class="ri-refresh-line"></i>
+                  <span data-i18n="btn_sync_now">Đồng bộ ngay</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div class="settings-row">
-            <div class="settings-row-info">
-              <span class="settings-row-title" data-i18n="row_sync_direction">Hướng đồng bộ</span>
-              <span class="settings-row-desc" data-i18n="row_sync_direction_desc">Quy tắc trao đổi dữ liệu</span>
+            <div class="settings-tip-box" id="sync-status-box" style="margin-top: 12px; font-size: 11px;">
+              <i class="ri-shield-check-fill" style="color: #10b981; margin-right: 4px;"></i>
+              <span id="sync-status-text">Đang đồng bộ an toàn với cơ sở dữ liệu Supabase của bạn.</span>
             </div>
-            <select class="settings-select" id="setting-sync-direction">
-              <option value="bidirectional" data-i18n="sync_dir_both">Hai chiều (Tải lên & Tải về)</option>
-              <option value="push_only" data-i18n="sync_dir_push">Chỉ tải lên máy chủ</option>
-              <option value="pull_only" data-i18n="sync_dir_pull">Chỉ tải về từ máy chủ</option>
-            </select>
-          </div>
-
-          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap;">
-            <button class="btn-secondary" id="btn-test-sync">
-              <i class="ri-wifi-line"></i>
-              <span data-i18n="btn_test_sync">Kiểm tra kết nối</span>
-            </button>
-            <button class="btn-secondary" id="btn-auto-setup-sync" title="Tự động tạo bảng bằng Personal Access Token (PAT)">
-              <i class="ri-magic-line"></i>
-              <span>Khởi tạo bảng (PAT)</span>
-            </button>
-            <button class="btn-primary" id="btn-sync-now">
-              <i class="ri-refresh-line"></i>
-              <span data-i18n="btn_sync_now">Đồng bộ ngay</span>
-            </button>
-          </div>
-
-          <div class="settings-tip-box" id="sync-status-box" style="margin-top: 8px; font-size: 11px;">
-            <i class="ri-cloud-line" style="color: var(--accent); margin-right: 4px;"></i>
-            <span id="sync-status-text">Mô hình BYOS (Bring Your Own Supabase): Dữ liệu được bảo mật hoàn toàn trên dự án cá nhân của bạn.</span>
           </div>
         </div>
 
@@ -552,16 +580,11 @@
     <div class="modal-overlay hidden" id="modal-pin" style="z-index: 120;">
       <div class="modal-card pin-dialog-card">
         <div class="modal-header">
-          <div class="pin-dialog-title-group">
-            <div class="pin-header-icon-badge">
-              <i class="ri-shield-keyhole-line"></i>
-            </div>
-            <div>
-              <h3 class="modal-title" id="pin-modal-title" data-i18n="pin_dlg_title_change">Đổi mã PIN Ghi chú</h3>
-              <p class="modal-subtitle" data-i18n="pin_dlg_subtitle">Bảo vệ an toàn cho các ghi chú của bạn</p>
-            </div>
+          <div class="modal-header-title-group">
+            <i class="ri-shield-keyhole-line"></i>
+            <h3 class="modal-title" id="pin-modal-title" data-i18n="pin_dlg_title_change">Đổi mã PIN Ghi chú</h3>
           </div>
-          <button class="modal-close-btn" id="btn-close-pin-modal" title="Đóng">
+          <button class="icon-btn close-btn" id="btn-close-pin-modal" title="Đóng">
             <i class="ri-close-line"></i>
           </button>
         </div>
@@ -669,17 +692,12 @@
     <div class="modal-overlay hidden" id="modal-sync-wizard" style="z-index: 150;">
       <div class="modal-card sync-wizard-card">
         <!-- Wizard Header -->
-        <div class="modal-header sync-wizard-header">
-          <div class="sync-wizard-title-group">
-            <div class="sync-wizard-badge-icon">
-              <i class="ri-cloud-line"></i>
-            </div>
-            <div>
-              <h3 class="modal-title" data-i18n="sync_wizard_title">Cấu hình đồng bộ đám mây (BYOS)</h3>
-              <p class="modal-subtitle" data-i18n="sync_wizard_subtitle">Thiết lập kết nối an toàn với cơ sở dữ liệu Supabase của bạn</p>
-            </div>
+        <div class="modal-header">
+          <div class="modal-header-title-group">
+            <i class="ri-cloud-line"></i>
+            <h3 class="modal-title" data-i18n="sync_wizard_title">Cấu hình đồng bộ đám mây (BYOS)</h3>
           </div>
-          <button class="btn-icon" id="btn-close-sync-wizard" title="Đóng">
+          <button class="icon-btn close-btn" id="btn-close-sync-wizard" title="Đóng">
             <i class="ri-close-line"></i>
           </button>
         </div>
@@ -728,7 +746,7 @@
                 <span data-i18n="wizard_key_label">Anon Public Key (API Key)</span>
                 <span class="wizard-field-required">*</span>
               </label>
-              <div class="pin-input-peek-wrapper">
+              <div class="input-with-action">
                 <input type="password" class="form-input" id="wizard-input-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." autocomplete="off" />
                 <button type="button" class="btn-peek" data-target="wizard-input-key" title="Hiện/ẩn API Key">
                   <i class="ri-eye-line"></i>
@@ -766,7 +784,7 @@
                 <span data-i18n="wizard_pat_label">Personal Access Token (PAT)</span>
                 <span class="wizard-field-required">*</span>
               </label>
-              <div class="pin-input-peek-wrapper">
+              <div class="input-with-action">
                 <input type="password" class="form-input" id="wizard-input-pat" placeholder="sbp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
                 <button type="button" class="btn-peek" data-target="wizard-input-pat" title="Hiện/ẩn PAT">
                   <i class="ri-eye-line"></i>
