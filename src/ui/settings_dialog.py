@@ -49,6 +49,7 @@ class SettingsDialog(Adw.PreferencesWindow):
         self._updating_lang = False
         self._updating_theme = False
         self._updating_limit = False
+        self._updating_sync_dir = False
 
         self._build_ui()
         self._update_localized_texts()
@@ -174,6 +175,11 @@ class SettingsDialog(Adw.PreferencesWindow):
         # URL đang kết nối
         self.sync_url_row = Adw.ActionRow()
         self.group_sync.add(self.sync_url_row)
+
+        # Hướng đồng bộ
+        self.sync_direction_row = Adw.ComboRow()
+        self.sync_direction_row.connect("notify::selected", self._on_sync_direction_changed)
+        self.group_sync.add(self.sync_direction_row)
 
         # Nút hành động
         sync_btn_row = Adw.ActionRow()
@@ -394,6 +400,17 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.db.clear_unpinned()
         self.on_settings_changed()
 
+    def _on_sync_direction_changed(self, combo, gparam):
+        if self._updating_sync_dir:
+            return
+        vals = ["both", "download_only", "upload_only"]
+        idx = combo.get_selected()
+        if 0 <= idx < len(vals):
+            new_dir = vals[idx]
+            self.db.set_setting("sync_direction", new_dir)
+            if self.on_settings_changed:
+                self.on_settings_changed()
+
     # ─── Sync Group ──────────────────────────────
 
     def _update_sync_group(self):
@@ -412,6 +429,25 @@ class SettingsDialog(Adw.PreferencesWindow):
             self.sync_url_row.set_title(t("row_sync_url", self.lang))
             self.sync_url_row.set_subtitle(url)
             self.sync_url_row.set_visible(True)
+
+            # Cập nhật dòng chọn hướng đồng bộ
+            self.sync_direction_row.set_title(t("row_sync_direction", self.lang))
+            self.sync_direction_row.set_subtitle(t("row_sync_direction_sub", self.lang))
+            dir_options = [
+                t("sync_dir_both", self.lang),
+                t("sync_dir_download", self.lang),
+                t("sync_dir_upload", self.lang),
+            ]
+            cur_dir = self.db.get_setting("sync_direction", "both")
+            dir_map = {"both": 0, "download_only": 1, "upload_only": 2}
+            target_dir_idx = dir_map.get(cur_dir, 0)
+
+            self._updating_sync_dir = True
+            self.sync_direction_row.set_model(Gtk.StringList.new(dir_options))
+            self.sync_direction_row.set_selected(target_dir_idx)
+            self._updating_sync_dir = False
+            self.sync_direction_row.set_visible(True)
+
             self.sync_now_btn.set_visible(True)
             self.sync_disconnect_btn.set_visible(True)
             self.sync_setup_btn.set_label(t("btn_sync_setup", self.lang))
@@ -420,6 +456,7 @@ class SettingsDialog(Adw.PreferencesWindow):
                 f'<span foreground="#9E9E9E">{t("row_sync_status_disconnected", self.lang)}</span>'
             )
             self.sync_url_row.set_visible(False)
+            self.sync_direction_row.set_visible(False)
             self.sync_now_btn.set_visible(False)
             self.sync_disconnect_btn.set_visible(False)
             self.sync_setup_btn.set_label(t("btn_sync_setup", self.lang))

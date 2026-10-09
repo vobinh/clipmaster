@@ -363,6 +363,9 @@ class SyncManager:
         """
         if not self.is_configured():
             return False
+        # Nếu chế độ là download_only thì không đẩy lên cloud
+        if self.db.get_setting("sync_direction", "both") == "download_only":
+            return False
 
         def _push():
             try:
@@ -395,6 +398,9 @@ class SyncManager:
         Dùng DELETE để Supabase không giữ các dòng thừa (tombstone).
         """
         if not self.is_configured():
+            return False
+        # Nếu chế độ là download_only thì không can thiệp cloud
+        if self.db.get_setting("sync_direction", "both") == "download_only":
             return False
 
         def _unpin():
@@ -438,13 +444,10 @@ class SyncManager:
         timeout: float = 8.0,
     ) -> tuple[bool, str]:
         """
-        Đồng bộ 2 chiều hoàn chỉnh giữa Local SQLite và Supabase Cloud:
-        1. Kéo toàn bộ mục trên Cloud về Local (Cloud -> Local).
-           Nếu Local chưa có hoặc bị xóa -> Khôi phục và ghim lại ngay!
-        2. So khớp các mục Local với Cloud:
-           - Mục Local nào chưa có trên Cloud mà được ghim mới -> Đẩy lên Cloud (Local -> Cloud).
-           - Mục Local nào đã ghim từ trước nhưng Cloud không còn -> Bỏ ghim ở Local (đồng bộ unpin từ máy khác).
-        3. Cập nhật last_sync_at.
+        Đồng bộ linh hoạt theo hướng đã chọn (both, download_only, upload_only):
+        - both: Đầy đủ 2 chiều (vừa kéo về vừa đẩy lên).
+        - download_only: Chỉ kéo từ Cloud về Local, không bao giờ ghi đè Cloud.
+        - upload_only: Chỉ đẩy từ Local lên Cloud (backup), không kéo về.
         """
         if not self.is_configured():
             if on_done:
@@ -459,6 +462,7 @@ class SyncManager:
 
         try:
             import time
+            direction = self.db.get_setting("sync_direction", "both")
             last_sync_str = self.db.get_setting("last_sync_at", "0")
             try:
                 last_sync_ts = float(last_sync_str)
@@ -469,73 +473,85 @@ class SyncManager:
                 except Exception:
                     last_sync_ts = 0.0
 
-            # 1. Kéo toàn bộ mục trên Cloud về (Cloud -> Local)
-            cloud_items = self.pull_all(timeout=timeout)
-            cloud_hashes = {
-                item["content_hash"]: item
-                for item in cloud_items
-                if "content_hash" in item
-            }
+            cloud_hashes = {}
 
-            for c_hash, item in cloud_hashes.items():
-                if self.db.pin_or_add_by_hash(item):
-                    pulled += 1
+            # 1. Kéo từ Cloud về Local (chạy khi direction là "both" hoặc "download_only")
+            if direction in ("both", "download_only"):
+                cloud_items = self.pull_all(timeout=timeout)
+                cloud_hashes = {
+                    item["content_hash"]: item
+                    for item in cloud_items
+                    if "content_hash" in item
+                }
 
-            # 2. Xử lý các mục đang ghim ở Local
-            local_pinned = self.db.get_pinned_for_sync()
-            to_push = []
+                for c_hash, item in cloud_hashes.items():
+                    if self.db.pin_or_add_by_hash(item):
+                        pulled += 1
 
-            for clip in local_pinned:
-                l_hash = clip.get("content_hash")
-                if not l_hash:
-                    continue
+                # Nếu là download_only: đồng bộ trạng thái unpin theo cloud
+                if direction == "download_only":
+                    local_pinned = self.db.get_pinned_for_sync()
+                    for clip in local_pinned:
+                        l_hash = clip.get("content_hash")
+                        if l_hash and l_hash not in cloud_hashes:
+                            self.db.unpin_by_hash(l_hash)
+                            unpinned += 1
 
-                if l_hash in cloud_hashes:
-                    # Đã có trên cả 2 bên -> đồng bộ
-                    continue
+            # 2. Đẩy từ Local lên Cloud (chạy khi direction là "both" hoặc "upload_only")
+            if direction in ("both", "upload_only"):
+                local_pinned = self.db.get_pinned_for_sync()
+                to_push = []
 
-                # Mục này có ở Local nhưng KHÔNG có trên Cloud:
-                clip_updated_at = clip.get("updated_at", 0.0)
+                for clip in local_pinned:
+                    l_hash = clip.get("content_hash")
+                    if not l_hash:
+                        continue
 
-                if last_sync_ts > 0 and clip_updated_at <= last_sync_ts:
-                    # Clip này đã tồn tại trước lần sync trước, nhưng giờ Cloud không còn
-                    # -> nghĩa là máy khác đã bỏ ghim / xóa khỏi Cloud -> unpin ở Local!
-                    self.db.unpin_by_hash(l_hash)
-                    unpinned += 1
-                else:
-                    # Clip này được ghim sau lần sync trước (hoặc chưa từng sync)
-                    # -> đây là mục mới ở Local -> đẩy lên Cloud!
-                    to_push.append(clip)
+                    if direction == "both" and l_hash in cloud_hashes:
+                        # Đã có trên cả 2 bên -> đồng bộ
+                        continue
 
-            # 3. Đẩy các mục local mới lên Cloud (Local -> Cloud)
-            if to_push:
-                now = _now_iso()
-                records = [
-                    {
-                        "content_hash": clip["content_hash"],
-                        "type": clip["type"],
-                        "content": clip.get("content"),
-                        "char_count": clip.get("char_count", 0),
-                        "line_count": clip.get("line_count", 0),
-                        "created_at": _ts_to_iso(clip.get("created_at", 0)),
-                        "updated_at": now,
-                        "deleted_at": None,
-                    }
-                    for clip in to_push
-                ]
-                try:
-                    self._rest_request(
-                        method="POST",
-                        path="/pinned_clips?on_conflict=content_hash",
-                        data=records,
-                        extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
-                        timeout=timeout,
-                    )
-                    pushed = len(records)
-                except Exception as e:
-                    print(f"[Sync] batch push error: {e}")
-                    error_msg = str(e)
-                    success = False
+                    # Mục này có ở Local nhưng KHÔNG có trên Cloud:
+                    clip_updated_at = clip.get("updated_at", 0.0)
+
+                    if direction == "both" and last_sync_ts > 0 and clip_updated_at <= last_sync_ts:
+                        # Clip này đã tồn tại trước lần sync trước, nhưng giờ Cloud không còn
+                        # -> nghĩa là máy khác đã bỏ ghim / xóa khỏi Cloud -> unpin ở Local!
+                        self.db.unpin_by_hash(l_hash)
+                        unpinned += 1
+                    else:
+                        # Clip này mới ở Local -> đẩy lên Cloud!
+                        to_push.append(clip)
+
+                # 3. Gửi batch lên Cloud
+                if to_push:
+                    now = _now_iso()
+                    records = [
+                        {
+                            "content_hash": clip["content_hash"],
+                            "type": clip["type"],
+                            "content": clip.get("content"),
+                            "char_count": clip.get("char_count", 0),
+                            "line_count": clip.get("line_count", 0),
+                            "created_at": _ts_to_iso(clip.get("created_at", 0)),
+                            "updated_at": now,
+                            "deleted_at": None,
+                        }
+                        for clip in to_push
+                    ]
+                    try:
+                        self._rest_request(
+                            method="POST",
+                            path="/pinned_clips?on_conflict=content_hash",
+                            data=records,
+                            extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                            timeout=timeout,
+                        )
+                        pushed = len(records)
+                    except Exception as e:
+                        print(f"[Sync] batch push error: {e}")
+                        error_msg = str(e)
+                        success = False
 
             # Cập nhật thời điểm sync
             if success:
