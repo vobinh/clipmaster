@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ClipMaster</title>
+  <link rel="stylesheet" href="icons/remixicon.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,55 +12,93 @@
     <!-- Header Bar -->
     <header class="header-bar" data-tauri-drag-region>
       <div class="header-left">
-        <span class="status-indicator active" id="status-indicator"></span>
-      </div>
-      <div class="header-center">
-        <h1 class="app-title" data-i18n="app_title">ClipMaster</h1>
-        <span class="app-subtitle" id="app-subtitle" data-i18n="app_subtitle">Lịch sử Clipboard (Win + V)</span>
+        <span class="status-indicator active" id="status-indicator" title="Connected"></span>
+        <div class="brand-group">
+          <h1 class="app-title" data-i18n="app_title">ClipMaster</h1>
+          <span class="app-subtitle" id="app-subtitle" data-i18n="app_subtitle">Lịch sử Clipboard (Win + V)</span>
+        </div>
       </div>
       <div class="header-right">
-        <button class="icon-btn" id="btn-clear" data-i18n-title="tooltip_clear" title="Xóa toàn bộ mục chưa ghim">🗑️</button>
-        <button class="icon-btn" id="btn-theme" data-i18n-title="tooltip_theme" title="Chuyển chế độ Sáng / Tối">🌙</button>
-        <button class="icon-btn" id="btn-settings" data-i18n-title="tooltip_settings" title="Cài đặt">⚙️</button>
-        <button class="icon-btn close-btn" id="btn-close" data-i18n-title="tooltip_close" title="Đóng (Esc)">✕</button>
+        <button class="icon-btn" id="btn-clear" data-i18n-title="tooltip_clear" title="Xóa toàn bộ mục chưa ghim">
+          <i class="ri-delete-bin-line"></i>
+        </button>
+        <button class="icon-btn" id="btn-theme" data-i18n-title="tooltip_theme" title="Chuyển chế độ Sáng / Tối">
+          <i class="ri-moon-line" id="icon-theme"></i>
+        </button>
+        <button class="icon-btn" id="btn-settings" data-i18n-title="tooltip_settings" title="Cài đặt">
+          <i class="ri-settings-3-line"></i>
+        </button>
+        <button class="icon-btn close-btn" id="btn-close" data-i18n-title="tooltip_close" title="Đóng (Esc)">
+          <i class="ri-close-line"></i>
+        </button>
       </div>
     </header>
 
-    <!-- Mode Switcher (History vs Notes) -->
+    <!-- Mode Switcher (Segmented Control) -->
     <div class="mode-switcher-container">
       <div class="mode-switcher">
-        <button class="mode-btn active" id="tab-history" data-i18n="tab_history">📋 Lịch sử</button>
-        <button class="mode-btn" id="tab-notes" data-i18n="tab_notes">📝 Ghi chú</button>
+        <button class="mode-btn active" id="tab-history">
+          <i class="ri-clipboard-line"></i>
+          <span data-i18n="tab_history">Lịch sử</span>
+        </button>
+        <button class="mode-btn" id="tab-notes">
+          <i class="ri-sticky-note-line"></i>
+          <span data-i18n="tab_notes">Ghi chú</span>
+        </button>
       </div>
     </div>
 
-    <!-- Combined Search & Filter Bar (1 Single Row) -->
-    <div class="search-filter-row">
-      <!-- Search Expandable Component -->
-      <div class="search-wrapper" id="search-wrapper">
-        <button class="search-toggle-chip" id="btn-search-toggle" data-i18n-title="tooltip_search_toggle" title="Tìm kiếm (Ctrl+F)">🔍</button>
-        <div class="search-input-box" id="search-input-box">
-          <input type="text" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Tìm kiếm nội dung đã copy... (Ctrl+F)" autocomplete="off" />
-          <button class="search-clear-btn" id="btn-search-clear" data-i18n-title="tooltip_search_clear" title="Đóng tìm kiếm (Esc)">✕</button>
-        </div>
+    <!-- Integrated Search Bar -->
+    <div class="search-section">
+      <div class="search-input-wrapper">
+        <i class="ri-search-line search-icon"></i>
+        <input type="text" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Tìm kiếm nội dung đã copy..." autocomplete="off" />
+        <span class="search-shortcut-badge"><kbd>Ctrl</kbd><kbd>F</kbd></span>
+        <button class="search-clear-btn hidden" id="btn-search-clear" data-i18n-title="tooltip_search_clear" title="Xóa tìm kiếm (Esc)">
+          <i class="ri-close-circle-fill"></i>
+        </button>
       </div>
 
-      <!-- Category Filter Chips -->
+      <!-- Filter Chips Carousel -->
       <div class="filter-chips-scroll" id="filter-chips-container">
         <!-- History Filters -->
         <div class="filter-chips-group" id="history-filters">
-          <button class="filter-chip active" data-filter="all" data-i18n="filter_all">🌟 Tất cả</button>
-          <button class="filter-chip" data-filter="text" data-i18n="filter_text">📝 Văn bản</button>
-          <button class="filter-chip" data-filter="code" data-i18n="filter_code">💻 Code</button>
-          <button class="filter-chip" data-filter="url" data-i18n="filter_url">🔗 Link</button>
-          <button class="filter-chip" data-filter="image" data-i18n="filter_image">🖼️ Ảnh</button>
-          <button class="filter-chip" data-filter="pinned" data-i18n="filter_pinned">📌 Đã ghim</button>
+          <button class="filter-chip active" data-filter="all">
+            <i class="ri-apps-2-line"></i>
+            <span data-i18n="filter_all">Tất cả</span>
+          </button>
+          <button class="filter-chip" data-filter="text">
+            <i class="ri-text"></i>
+            <span data-i18n="filter_text">Văn bản</span>
+          </button>
+          <button class="filter-chip" data-filter="code">
+            <i class="ri-code-s-slash-line"></i>
+            <span data-i18n="filter_code">Code</span>
+          </button>
+          <button class="filter-chip" data-filter="url">
+            <i class="ri-link"></i>
+            <span data-i18n="filter_url">Liên kết</span>
+          </button>
+          <button class="filter-chip" data-filter="image">
+            <i class="ri-image-line"></i>
+            <span data-i18n="filter_image">Hình ảnh</span>
+          </button>
+          <button class="filter-chip" data-filter="pinned">
+            <i class="ri-pushpin-line"></i>
+            <span data-i18n="filter_pinned">Đã ghim</span>
+          </button>
         </div>
 
         <!-- Notes Filters -->
         <div class="filter-chips-group hidden" id="notes-filters">
-          <button class="filter-chip active" data-filter="all" data-i18n="filter_all">🌟 Tất cả</button>
-          <button class="filter-chip" data-filter="pinned" data-i18n="filter_pinned">📌 Đã ghim</button>
+          <button class="filter-chip active" data-filter="all">
+            <i class="ri-apps-2-line"></i>
+            <span data-i18n="filter_all">Tất cả</span>
+          </button>
+          <button class="filter-chip" data-filter="pinned">
+            <i class="ri-pushpin-line"></i>
+            <span data-i18n="filter_pinned">Đã ghim</span>
+          </button>
         </div>
       </div>
     </div>
@@ -73,7 +112,9 @@
 
       <!-- Empty State -->
       <div class="empty-state hidden" id="empty-state">
-        <div class="empty-icon" id="empty-icon">📋</div>
+        <div class="empty-icon" id="empty-icon">
+          <i class="ri-inbox-archive-line"></i>
+        </div>
         <h3 class="empty-title" id="empty-title" data-i18n="empty_history_title">Chưa có nội dung sao chép nào</h3>
         <p class="empty-desc" id="empty-desc" data-i18n="empty_history_desc">Sao chép văn bản, liên kết hoặc hình ảnh bất kỳ (Ctrl + C) để lưu vào đây.</p>
       </div>
@@ -81,7 +122,9 @@
       <!-- PIN Security Lock Screen -->
       <div class="pin-lock-screen hidden" id="pin-lock-screen">
         <div class="pin-lock-card">
-          <div class="pin-icon">🔒</div>
+          <div class="pin-icon">
+            <i class="ri-shield-keyhole-line"></i>
+          </div>
           <h2 class="pin-title" data-i18n="pin_title">Ghi chú được bảo vệ bằng mã PIN</h2>
           <p class="pin-subtitle" id="pin-subtitle" data-i18n="pin_subtitle">Vui lòng nhập mã PIN 4 chữ số để mở khóa</p>
 
@@ -106,25 +149,39 @@
             <button class="key-btn" data-key="7">7</button>
             <button class="key-btn" data-key="8">8</button>
             <button class="key-btn" data-key="9">9</button>
-            <button class="key-btn action-key" data-action="clear" data-i18n="pin_key_clear">Xóa hết</button>
+            <button class="key-btn action-key" data-action="clear" title="Xóa hết">
+              <i class="ri-delete-bin-line"></i>
+            </button>
             <button class="key-btn" data-key="0">0</button>
-            <button class="key-btn action-key" data-action="backspace">⌫</button>
+            <button class="key-btn action-key" data-action="backspace" title="Xóa lùi">
+              <i class="ri-backspace-line"></i>
+            </button>
           </div>
 
-          <button class="back-btn" id="btn-pin-back" data-i18n="pin_btn_back">← Quay lại Lịch sử</button>
+          <button class="back-btn" id="btn-pin-back">
+            <i class="ri-arrow-left-line"></i>
+            <span data-i18n="pin_btn_back">Quay lại Lịch sử</span>
+          </button>
         </div>
       </div>
     </main>
 
     <!-- Floating Action Button (FAB) for Notes -->
-    <button class="fab-btn hidden" id="btn-fab-create-note" data-i18n-title="tooltip_fab_note" title="Tạo ghi chú mới (Ctrl+N)">＋</button>
+    <button class="fab-btn hidden" id="btn-fab-create-note" data-i18n-title="tooltip_fab_note" title="Tạo ghi chú mới (Ctrl+N)">
+      <i class="ri-add-line"></i>
+    </button>
 
     <!-- Modal Note Editor -->
     <div class="modal-overlay hidden" id="modal-note">
       <div class="modal-card">
         <div class="modal-header">
-          <h3 class="modal-title" id="modal-note-title" data-i18n="modal_note_new">Tạo ghi chú mới</h3>
-          <button class="icon-btn close-btn" id="btn-close-note-modal">✕</button>
+          <div class="modal-header-title-group">
+            <i class="ri-sticky-note-line"></i>
+            <h3 class="modal-title" id="modal-note-title" data-i18n="modal_note_new">Tạo ghi chú mới</h3>
+          </div>
+          <button class="icon-btn close-btn" id="btn-close-note-modal">
+            <i class="ri-close-line"></i>
+          </button>
         </div>
         <div class="modal-body">
           <input type="hidden" id="note-id" value="" />
@@ -150,7 +207,10 @@
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" id="btn-cancel-note" data-i18n="btn_cancel">Hủy</button>
-          <button class="btn-primary" id="btn-save-note" data-i18n="btn_save_note">Lưu ghi chú</button>
+          <button class="btn-primary" id="btn-save-note">
+            <i class="ri-check-line"></i>
+            <span data-i18n="btn_save_note">Lưu ghi chú</span>
+          </button>
         </div>
       </div>
     </div>
@@ -160,19 +220,45 @@
       <div class="modal-card settings-modal-card">
         <!-- Header -->
         <div class="modal-header">
-          <h3 class="modal-title" data-i18n="settings_title">⚙️ Cài đặt ClipMaster</h3>
-          <button class="icon-btn close-btn" id="btn-close-settings-modal">✕</button>
+          <div class="modal-header-title-group">
+            <i class="ri-settings-3-line"></i>
+            <h3 class="modal-title" data-i18n="settings_title">Cài đặt ClipMaster</h3>
+          </div>
+          <button class="icon-btn close-btn" id="btn-close-settings-modal">
+            <i class="ri-close-line"></i>
+          </button>
         </div>
 
         <!-- Navigation Tabs -->
         <div class="settings-nav-tabs" id="settings-nav-tabs">
-          <button class="settings-nav-btn active" data-tab="general" data-i18n="settings_tab_general">🎨 Chung</button>
-          <button class="settings-nav-btn" data-tab="storage" data-i18n="settings_tab_storage">📋 Bộ nhớ</button>
-          <button class="settings-nav-btn" data-tab="shortcut" data-i18n="settings_tab_shortcut">⌨️ Phím tắt</button>
-          <button class="settings-nav-btn" data-tab="security" data-i18n="settings_tab_security">🔒 Bảo mật PIN</button>
-          <button class="settings-nav-btn" data-tab="sync" data-i18n="settings_tab_sync">☁️ Đồng bộ</button>
-          <button class="settings-nav-btn" data-tab="maintenance" data-i18n="settings_tab_maintenance">⚠️ Dọn dẹp</button>
-          <button class="settings-nav-btn" data-tab="about" data-i18n="settings_tab_about">ℹ️ Thông tin</button>
+          <button class="settings-nav-btn active" data-tab="general">
+            <i class="ri-palette-line"></i>
+            <span data-i18n="settings_tab_general">Chung</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="storage">
+            <i class="ri-database-2-line"></i>
+            <span data-i18n="settings_tab_storage">Bộ nhớ</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="shortcut">
+            <i class="ri-keyboard-line"></i>
+            <span data-i18n="settings_tab_shortcut">Phím tắt</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="security">
+            <i class="ri-shield-keyhole-line"></i>
+            <span data-i18n="settings_tab_security">Bảo mật PIN</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="sync">
+            <i class="ri-cloud-line"></i>
+            <span data-i18n="settings_tab_sync">Đồng bộ</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="maintenance">
+            <i class="ri-delete-bin-7-line"></i>
+            <span data-i18n="settings_tab_maintenance">Dọn dẹp</span>
+          </button>
+          <button class="settings-nav-btn" data-tab="about">
+            <i class="ri-information-line"></i>
+            <span data-i18n="settings_tab_about">Thông tin</span>
+          </button>
         </div>
 
         <!-- Tab 1: Chung (General) -->
@@ -184,8 +270,8 @@
               <span class="settings-row-desc" data-i18n="row_theme_desc">Giao diện màu tối, sáng hoặc theo hệ thống</span>
             </div>
             <select class="settings-select" id="setting-theme-mode">
-              <option value="dark" data-i18n="theme_dark">🌙 Tối (Dark)</option>
-              <option value="light" data-i18n="theme_light">☀️ Sáng (Light)</option>
+              <option value="dark" data-i18n="theme_dark">Tối (Dark)</option>
+              <option value="light" data-i18n="theme_light">Sáng (Light)</option>
             </select>
           </div>
 
@@ -195,8 +281,8 @@
               <span class="settings-row-desc" data-i18n="row_lang_desc">Ngôn ngữ giao diện ứng dụng</span>
             </div>
             <select class="settings-select" id="setting-language">
-              <option value="vi">🇻🇳 Tiếng Việt</option>
-              <option value="en">🇬🇧 English</option>
+              <option value="vi">Tiếng Việt (Vietnamese)</option>
+              <option value="en">English (UK/US)</option>
             </select>
           </div>
 
@@ -280,8 +366,8 @@
               <option value="<Control><Alt>v">Ctrl + Alt + V</option>
             </select>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; padding: 4px;" data-i18n="shortcut_hint">
-            💡 Gợi ý: Trên Linux & Windows, phím Super + V (Win + V) mang lại trải nghiệm mở khay clipboard trực quan và tiện lợi nhất.
+          <div class="settings-tip-box" data-i18n="shortcut_hint">
+            Gợi ý: Trên Linux & Windows, phím Super + V (Win + V) mang lại trải nghiệm mở khay clipboard trực quan và tiện lợi nhất.
           </div>
         </div>
 
@@ -303,7 +389,10 @@
           <div class="settings-row" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; gap: 8px; align-items: center;">
               <input type="password" class="form-input" id="setting-new-pin" maxlength="4" data-i18n-placeholder="pin_input_placeholder" placeholder="Nhập mã PIN mới (4 số)" style="flex: 1;" />
-              <button class="btn-primary" id="btn-set-pin" data-i18n="btn_save_pin" style="padding: 7px 12px;">Lưu mã PIN</button>
+              <button class="btn-primary" id="btn-set-pin" style="padding: 7px 14px;">
+                <i class="ri-shield-check-line"></i>
+                <span data-i18n="btn_save_pin">Lưu mã PIN</span>
+              </button>
             </div>
             <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" data-i18n="pin_hint">Mã PIN gồm đúng 4 chữ số (0-9) dùng để bảo vệ quyền riêng tư các ghi chú.</span>
           </div>
@@ -350,7 +439,7 @@
           <div class="settings-row">
             <div class="settings-row-info">
               <span class="settings-row-title" data-i18n="row_sync_direction">Hướng đồng bộ</span>
-              <span class="settings-row-desc" data-i18n="row_sync_direction_desc">Quy tắc tải dữ liệu</span>
+              <span class="settings-row-desc" data-i18n="row_sync_direction_desc">Quy tắc trao đổi dữ liệu</span>
             </div>
             <select class="settings-select" id="setting-sync-direction">
               <option value="bidirectional" data-i18n="sync_dir_both">Hai chiều (Tải lên & Tải về)</option>
@@ -360,7 +449,10 @@
           </div>
 
           <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
-            <button class="btn-secondary" id="btn-test-sync" data-i18n="btn_test_sync">Kiểm tra kết nối</button>
+            <button class="btn-secondary" id="btn-test-sync">
+              <i class="ri-wifi-line"></i>
+              <span data-i18n="btn_test_sync">Kiểm tra kết nối</span>
+            </button>
           </div>
         </div>
 
@@ -370,9 +462,12 @@
           <div class="settings-row">
             <div class="settings-row-info">
               <span class="settings-row-title" data-i18n="row_clear_unpinned">Xóa lịch sử chưa ghim</span>
-              <span class="settings-row-desc" data-i18n="row_clear_unpinned_desc">Giữ lại các mục quan trọng đã ghim (📌)</span>
+              <span class="settings-row-desc" data-i18n="row_clear_unpinned_desc">Giữ lại các mục quan trọng đã ghim</span>
             </div>
-            <button class="btn-secondary" id="btn-settings-clear-unpinned" data-i18n="btn_clear_now" style="color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3);">Xóa ngay</button>
+            <button class="btn-danger-outline" id="btn-settings-clear-unpinned">
+              <i class="ri-delete-bin-line"></i>
+              <span data-i18n="btn_clear_now">Xóa ngay</span>
+            </button>
           </div>
 
           <div class="settings-section-title" data-i18n="sec_reset">Khôi phục mặc định</div>
@@ -381,20 +476,25 @@
               <span class="settings-row-title" data-i18n="row_reset_all">Đặt lại toàn bộ cài đặt</span>
               <span class="settings-row-desc" data-i18n="row_reset_all_desc">Khôi phục tất cả thiết lập về trạng thái ban đầu</span>
             </div>
-            <button class="btn-secondary" id="btn-reset-defaults" data-i18n="btn_reset_now" style="color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3);">Khôi phục</button>
+            <button class="btn-danger-outline" id="btn-reset-defaults">
+              <i class="ri-restart-line"></i>
+              <span data-i18n="btn_reset_now">Khôi phục</span>
+            </button>
           </div>
         </div>
 
         <!-- Tab 7: Thông tin (About) -->
         <div class="settings-content-body hidden" id="tab-pane-about">
-          <div style="text-align: center; padding: 20px 0;">
-            <div style="font-size: 42px; margin-bottom: 8px;">📋</div>
-            <h2 style="font-size: 16px; font-weight: 700;">ClipMaster</h2>
-            <div style="font-size: 12px; color: var(--accent-color); font-weight: 600; margin-top: 2px;" data-i18n="about_version">Phiên bản 2.0.0 (Native Rust Edition)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.6; max-width: 340px; margin-left: auto; margin-right: auto;" data-i18n="about_desc">
-              Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust 🦀 và Tauri v2 ⚡. Hỗ trợ Linux, Windows và macOS.
+          <div class="about-card">
+            <div class="about-logo">
+              <i class="ri-clipboard-fill"></i>
+            </div>
+            <h2 class="about-title">ClipMaster</h2>
+            <div class="about-badge" data-i18n="about_version">Phiên bản 2.0.0 (Native Rust Edition)</div>
+            <p class="about-text" data-i18n="about_desc">
+              Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust và Tauri v2. Hỗ trợ Linux, Windows và macOS.
             </p>
-            <div style="margin-top: 16px; font-size: 11px; color: var(--text-muted);" data-i18n="about_copyright">
+            <div class="about-copyright" data-i18n="about_copyright">
               Giữ bản quyền © 2026 ClipMaster Open Source.
             </div>
           </div>
@@ -402,18 +502,26 @@
 
         <!-- Footer -->
         <div class="modal-footer">
-          <button class="btn-primary" id="btn-save-settings" data-i18n="btn_save_settings">Đóng & Lưu</button>
+          <button class="btn-primary" id="btn-save-settings">
+            <i class="ri-check-line"></i>
+            <span data-i18n="btn_save_settings">Đóng & Lưu</span>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Toast Notification -->
-    <div class="toast" id="toast">Đã sao chép vào bộ nhớ tạm!</div>
+    <div class="toast" id="toast">
+      <i class="ri-check-circle-line"></i>
+      <span id="toast-text">Đã sao chép vào bộ nhớ tạm!</span>
+    </div>
 
     <!-- Status Bar -->
     <footer class="footer-bar">
       <span class="footer-status" id="footer-status">Tổng cộng: 0 mục (0 đã ghim)</span>
-      <span class="footer-hint" data-i18n="footer_hint">↑↓ Chọn • Enter Dán • Del Xóa</span>
+      <span class="footer-hint">
+        <kbd>↑</kbd><kbd>↓</kbd> Chọn • <kbd>↵</kbd> Dán • <kbd>Del</kbd> Xóa
+      </span>
     </footer>
   </div>
 

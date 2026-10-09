@@ -1,6 +1,6 @@
 /**
  * ClipMaster - Cross-Platform Modern Frontend Controller
- * Tauri v2 IPC Bridge & Interactive UI Logic & i18n
+ * Tauri v2 IPC Bridge & Interactive UI Logic & RemixIcon Design System
  */
 
 // ── IPC Abstraction Layer ──────────────────────────────────────────
@@ -269,6 +269,15 @@ function applyLanguage(lang) {
   }
 }
 
+// ── Theme Management ────────────────────────────────────────────────
+function updateThemeUI(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon = document.getElementById('icon-theme');
+  if (icon) {
+    icon.className = theme === 'dark' ? 'ri-moon-line' : 'ri-sun-line';
+  }
+}
+
 // ── Application State ──────────────────────────────────────────────
 const state = {
   mode: 'history', // 'history' | 'notes'
@@ -300,8 +309,6 @@ const DOM = {
   appSubtitle: document.getElementById('app-subtitle'),
   
   // Search
-  searchWrapper: document.getElementById('search-wrapper'),
-  btnSearchToggle: document.getElementById('btn-search-toggle'),
   searchInput: document.getElementById('search-input'),
   btnSearchClear: document.getElementById('btn-search-clear'),
 
@@ -349,7 +356,8 @@ const DOM = {
   btnSaveSettings: document.getElementById('btn-save-settings'),
 
   // Toast
-  toast: document.getElementById('toast')
+  toast: document.getElementById('toast'),
+  toastText: document.getElementById('toast-text')
 };
 
 // ── Time & Formatting Helpers ──────────────────────────────────────
@@ -369,7 +377,9 @@ function formatRelativeTime(timestamp) {
 }
 
 function showToast(message) {
-  DOM.toast.textContent = message;
+  if (DOM.toastText) DOM.toastText.textContent = message;
+  else DOM.toast.textContent = message;
+  
   DOM.toast.classList.add('show');
   setTimeout(() => {
     DOM.toast.classList.remove('show');
@@ -462,12 +472,17 @@ function renderHistoryCards(items) {
     if (index === 0) state.selectedIndex = 0;
 
     let typeBadgeLabel = (item.type || "text").toUpperCase();
-    let previewHtml = '';
+    let typeIcon = 'ri-text';
+    if (item.type === 'code') typeIcon = 'ri-code-s-slash-line';
+    else if (item.type === 'url') typeIcon = 'ri-link';
+    else if (item.type === 'color') typeIcon = 'ri-palette-line';
+    else if (item.type === 'image') typeIcon = 'ri-image-line';
 
+    let previewHtml = '';
     if (item.type === 'color') {
       previewHtml = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="width: 18px; height: 18px; border-radius: 4px; background: ${escapeHtml(item.content)}; border: 1px solid rgba(255,255,255,0.2); display: inline-block;"></span>
+          <span style="width: 16px; height: 16px; border-radius: 4px; background: ${escapeHtml(item.content)}; border: 1px solid rgba(255,255,255,0.2); display: inline-block;"></span>
           <span class="card-content font-mono">${escapeHtml(item.content)}</span>
         </div>`;
     } else if (item.type === 'code') {
@@ -478,15 +493,17 @@ function renderHistoryCards(items) {
 
     card.innerHTML = `
       <div class="card-header">
-        <span class="card-badge">${typeBadgeLabel}</span>
+        <span class="card-badge"><i class="${typeIcon}"></i> ${typeBadgeLabel}</span>
         <span class="card-time">${formatRelativeTime(item.updated_at)}</span>
       </div>
       ${previewHtml}
       <div class="card-actions">
         <button class="card-btn ${item.is_pinned ? 'pinned' : ''}" data-action="pin" title="${item.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
-          ${item.is_pinned ? '📌' : '📍'}
+          <i class="${item.is_pinned ? 'ri-pushpin-fill' : 'ri-pushpin-line'}"></i>
         </button>
-        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">🗑️</button>
+        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">
+          <i class="ri-delete-bin-line"></i>
+        </button>
       </div>
     `;
 
@@ -537,7 +554,7 @@ function renderNoteCards(notes) {
     card.dataset.id = note.id;
 
     if (note.color) {
-      card.style.borderLeft = `4px solid ${note.color}`;
+      card.style.borderLeft = `3px solid ${note.color}`;
     }
 
     if (index === 0) state.selectedIndex = 0;
@@ -546,17 +563,21 @@ function renderNoteCards(notes) {
 
     card.innerHTML = `
       <div class="card-header">
-        <span class="card-badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">NOTE</span>
+        <span class="card-badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc;"><i class="ri-sticky-note-line"></i> NOTE</span>
         <span class="card-time">${formatRelativeTime(note.updated_at)}</span>
       </div>
       ${titleHtml}
       <div class="card-content">${escapeHtml(note.content)}</div>
       <div class="card-actions">
-        <button class="card-btn" data-action="edit" title="${t('tooltip_edit')}">✏️</button>
-        <button class="card-btn ${note.is_pinned ? 'pinned' : ''}" data-action="pin" title="${note.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
-          ${note.is_pinned ? '📌' : '📍'}
+        <button class="card-btn" data-action="edit" title="${t('tooltip_edit')}">
+          <i class="ri-edit-line"></i>
         </button>
-        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">🗑️</button>
+        <button class="card-btn ${note.is_pinned ? 'pinned' : ''}" data-action="pin" title="${note.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
+          <i class="${note.is_pinned ? 'ri-pushpin-fill' : 'ri-pushpin-line'}"></i>
+        </button>
+        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">
+          <i class="ri-delete-bin-line"></i>
+        </button>
       </div>
     `;
 
@@ -634,29 +655,31 @@ async function deleteClip(id) {
 
 // ── Search & Filter Interactions ───────────────────────────────────
 function setupSearchAndFilters() {
-  DOM.btnSearchToggle.addEventListener('click', () => {
-    DOM.searchWrapper.classList.add('expanded');
-    DOM.searchInput.focus();
-  });
-
-  DOM.btnSearchClear.addEventListener('click', () => {
-    if (DOM.searchInput.value) {
-      DOM.searchInput.value = '';
-      state.searchQuery = '';
-      triggerReload();
-    } else {
-      DOM.searchWrapper.classList.remove('expanded');
-    }
-  });
-
   let debounceTimer = null;
+
   DOM.searchInput.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (DOM.btnSearchClear) {
+      if (val) DOM.btnSearchClear.classList.remove('hidden');
+      else DOM.btnSearchClear.classList.add('hidden');
+    }
+
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      state.searchQuery = e.target.value;
+      state.searchQuery = val;
       triggerReload();
     }, 150);
   });
+
+  if (DOM.btnSearchClear) {
+    DOM.btnSearchClear.addEventListener('click', () => {
+      DOM.searchInput.value = '';
+      state.searchQuery = '';
+      DOM.btnSearchClear.classList.add('hidden');
+      DOM.searchInput.focus();
+      triggerReload();
+    });
+  }
 
   // History Filter Chips
   DOM.historyFilters.querySelectorAll('.filter-chip').forEach(chip => {
@@ -950,7 +973,7 @@ async function openSettingsModal() {
   if (elPinTimeout) elPinTimeout.value = pinTimeout;
   if (elPinStatus) {
     elPinStatus.textContent = pinEnabled ? t('pin_status_on') : t('pin_status_off');
-    elPinStatus.style.color = pinEnabled ? "var(--success-color)" : "var(--text-muted)";
+    elPinStatus.style.color = pinEnabled ? "var(--success)" : "var(--text-tertiary)";
   }
 
   // Sync tab
@@ -997,13 +1020,12 @@ function setupSettingsModal() {
   if (elTheme) {
     elTheme.addEventListener('change', async () => {
       const val = elTheme.value;
-      document.documentElement.setAttribute('data-theme', val);
-      DOM.btnTheme.textContent = val === 'dark' ? '🌙' : '☀️';
+      updateThemeUI(val);
       await invoke('set_setting', { key: 'theme_mode', value: val });
     });
   }
 
-  // Language switch inside settings immediately reflects!
+  // Language switch inside settings immediately reflects
   const elLang = document.getElementById('setting-language');
   if (elLang) {
     elLang.addEventListener('change', async () => {
@@ -1030,7 +1052,7 @@ function setupSettingsModal() {
       const elPinToggle = document.getElementById('setting-pin-toggle');
       if (elPinStatus) {
         elPinStatus.textContent = t('pin_status_on');
-        elPinStatus.style.color = "var(--success-color)";
+        elPinStatus.style.color = "var(--success)";
       }
       if (elPinToggle) elPinToggle.checked = true;
       showToast(t('toast_pin_saved'));
@@ -1047,7 +1069,7 @@ function setupSettingsModal() {
         state.notesUnlocked = true;
         if (elPinStatus) {
           elPinStatus.textContent = t('pin_status_off');
-          elPinStatus.style.color = "var(--text-muted)";
+          elPinStatus.style.color = "var(--text-tertiary)";
         }
         showToast(t('toast_pin_disabled'));
       } else {
@@ -1093,6 +1115,7 @@ function setupSettingsModal() {
       if (confirm(t('confirm_reset_settings'))) {
         await invoke('reset_settings');
         applyLanguage('vi');
+        updateThemeUI('dark');
         showToast(t('toast_defaults_restored'));
         closeSettingsModal();
         await loadClips();
@@ -1116,7 +1139,10 @@ function setupSettingsModal() {
     const elSyncToken = document.getElementById('setting-sync-token');
     const elSyncDirection = document.getElementById('setting-sync-direction');
 
-    if (elTheme) await invoke('set_setting', { key: 'theme_mode', value: elTheme.value });
+    if (elTheme) {
+      updateThemeUI(elTheme.value);
+      await invoke('set_setting', { key: 'theme_mode', value: elTheme.value });
+    }
     if (elLang) {
       const langVal = elLang.value;
       applyLanguage(langVal);
@@ -1167,8 +1193,8 @@ function setupKeyboardNavigation() {
     // Ctrl + F search shortcut
     if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault();
-      DOM.searchWrapper.classList.add('expanded');
       DOM.searchInput.focus();
+      DOM.searchInput.select();
       return;
     }
 
@@ -1180,12 +1206,12 @@ function setupKeyboardNavigation() {
       return;
     }
 
-    // Escape closes search or hides window
+    // Escape clears search or hides window
     if (e.key === 'Escape') {
-      if (DOM.searchWrapper.classList.contains('expanded')) {
-        DOM.searchWrapper.classList.remove('expanded');
+      if (DOM.searchInput.value) {
         DOM.searchInput.value = '';
         state.searchQuery = '';
+        if (DOM.btnSearchClear) DOM.btnSearchClear.classList.add('hidden');
         triggerReload();
       } else {
         await invoke('hide_window');
@@ -1253,8 +1279,7 @@ function setupHeaderActions() {
   DOM.btnTheme.addEventListener('click', async () => {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
     const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', nextTheme);
-    DOM.btnTheme.textContent = nextTheme === 'dark' ? '🌙' : '☀️';
+    updateThemeUI(nextTheme);
     await invoke('set_setting', { key: 'theme_mode', value: nextTheme });
   });
 }
@@ -1284,7 +1309,7 @@ function escapeHtml(str) {
 
 // ── Initialization ─────────────────────────────────────────────────
 async function init() {
-  console.log("[ClipMaster] Initializing...");
+  console.log("[ClipMaster] Initializing with RemixIcon Design System...");
   const hasTauri = !!getTauriInvoke();
   if (DOM.statusIndicator) {
     if (hasTauri) {
@@ -1308,10 +1333,10 @@ async function init() {
   // Load saved theme
   try {
     const savedTheme = await invoke('get_setting', { key: 'theme_mode', default_val: 'dark' });
-    document.documentElement.setAttribute('data-theme', savedTheme || 'dark');
-    DOM.btnTheme.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    updateThemeUI(savedTheme || 'dark');
   } catch (e) {
     console.error("Theme load error:", e);
+    updateThemeUI('dark');
   }
 
   // Load saved language

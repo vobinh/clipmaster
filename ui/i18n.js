@@ -1,5 +1,6 @@
 /**
  * ClipMaster i18n Translation Dictionary
+ * Clean professional text without unicode emojis
  * Vietnamese (vi) and English (en)
  */
 
@@ -15,29 +16,29 @@ const I18N = {
     tooltip_close: "Đóng (Esc)",
 
     // Mode Switcher
-    tab_history: "📋 Lịch sử",
-    tab_notes: "📝 Ghi chú",
+    tab_history: "Lịch sử",
+    tab_notes: "Ghi chú",
 
     // Search
-    search_placeholder: "Tìm kiếm nội dung đã copy... (Ctrl+F)",
-    search_notes_placeholder: "Tìm kiếm trong ghi chú... (Ctrl+F)",
+    search_placeholder: "Tìm kiếm nội dung đã copy...",
+    search_notes_placeholder: "Tìm kiếm trong ghi chú...",
     tooltip_search_toggle: "Tìm kiếm (Ctrl+F)",
-    tooltip_search_clear: "Đóng tìm kiếm (Esc)",
+    tooltip_search_clear: "Xóa tìm kiếm (Esc)",
 
     // Filters
-    filter_all: "🌟 Tất cả",
-    filter_text: "📝 Văn bản",
-    filter_code: "💻 Code",
-    filter_url: "🔗 Link",
-    filter_image: "🖼️ Ảnh",
-    filter_pinned: "📌 Đã ghim",
+    filter_all: "Tất cả",
+    filter_text: "Văn bản",
+    filter_code: "Code",
+    filter_url: "Liên kết",
+    filter_image: "Hình ảnh",
+    filter_pinned: "Đã ghim",
 
     // Empty States
     empty_history_title: "Chưa có nội dung sao chép nào",
     empty_history_desc: "Sao chép bất kỳ văn bản, code hoặc liên kết (Ctrl + C) để lưu tự động.",
     empty_history_search: "Không tìm thấy kết quả phù hợp với từ khóa.",
     empty_notes_title: "Chưa có ghi chú nào",
-    empty_notes_desc: "Nhấn nút (＋) ở góc dưới để tạo ghi chú mới.",
+    empty_notes_desc: "Nhấn nút thêm ở góc dưới để tạo ghi chú mới.",
     empty_notes_search: "Không tìm thấy ghi chú phù hợp với từ khóa.",
 
     // Footer
@@ -49,7 +50,7 @@ const I18N = {
     pin_title: "Ghi chú được bảo vệ bằng mã PIN",
     pin_subtitle: "Vui lòng nhập mã PIN 4 chữ số để mở khóa",
     pin_key_clear: "Xóa hết",
-    pin_btn_back: "← Quay lại Lịch sử",
+    pin_btn_back: "Quay lại Lịch sử",
     pin_err_incorrect: "Sai mã PIN. Còn lại {attempts} lần thử.",
     pin_err_lockout: "Khóa tạm thời: Vui lòng đợi {seconds}s",
 
@@ -66,21 +67,21 @@ const I18N = {
     btn_save_note: "Lưu ghi chú",
 
     // Settings Modal
-    settings_title: "⚙️ Cài đặt ClipMaster",
-    settings_tab_general: "🎨 Chung",
-    settings_tab_storage: "📋 Bộ nhớ",
-    settings_tab_shortcut: "⌨️ Phím tắt",
-    settings_tab_security: "🔒 Bảo mật PIN",
-    settings_tab_sync: "☁️ Đồng bộ",
-    settings_tab_maintenance: "⚠️ Dọn dẹp",
-    settings_tab_about: "ℹ️ Thông tin",
+    settings_title: "Cài đặt ClipMaster",
+    settings_tab_general: "Chung",
+    settings_tab_storage: "Bộ nhớ",
+    settings_tab_shortcut: "Phím tắt",
+    settings_tab_security: "Bảo mật PIN",
+    settings_tab_sync: "Đồng bộ",
+    settings_tab_maintenance: "Dọn dẹp",
+    settings_tab_about: "Thông tin",
 
     // Settings General
     sec_appearance: "Giao diện & Trải nghiệm",
     row_theme: "Chế độ giao diện",
     row_theme_desc: "Giao diện màu tối, sáng hoặc theo hệ thống",
-    theme_dark: "🌙 Tối (Dark)",
-    theme_light: "☀️ Sáng (Light)",
+    theme_dark: "Tối (Dark)",
+    theme_light: "Sáng (Light)",
     row_lang: "Ngôn ngữ hiển thị",
     row_lang_desc: "Ngôn ngữ giao diện ứng dụng",
     sec_system: "Hệ thống",
@@ -108,7 +109,7 @@ const I18N = {
     sec_shortcut: "Phím tắt toàn hệ thống",
     row_shortcut: "Phím tắt mở ClipMaster",
     row_shortcut_desc: "Nhấn tổ hợp phím này ở bất cứ đâu để mở ứng dụng",
-    shortcut_hint: "💡 Gợi ý: Trên Linux & Windows, phím Super + V (Win + V) mang lại trải nghiệm mở khay clipboard trực quan và tiện lợi nhất.",
+    shortcut_hint: "Gợi ý: Trên Linux & Windows, phím Super + V (Win + V) mang lại trải nghiệm mở khay clipboard trực quan và tiện lợi nhất.",
 
     // Settings Security
     sec_pin_protect: "Bảo vệ mục Ghi chú",
@@ -134,7 +135,7 @@ const I18N = {
     sync_url_label: "URL Máy chủ (Sync Server URL)",
     sync_token_label: "Mã xác thực (API Token / Key)",
     row_sync_direction: "Hướng đồng bộ",
-    row_sync_direction_desc: "Quy tắc tải dữ liệu",
+    row_sync_direction_desc: "Quy tắc trao đổi dữ liệu",
     sync_dir_both: "Hai chiều (Tải lên & Tải về)",
     sync_dir_push: "Chỉ tải lên máy chủ",
     sync_dir_pull: "Chỉ tải về từ máy chủ",
@@ -143,7 +144,7 @@ const I18N = {
     // Settings Maintenance
     sec_cleanup: "Dọn dẹp dữ liệu",
     row_clear_unpinned: "Xóa lịch sử chưa ghim",
-    row_clear_unpinned_desc: "Giữ lại các mục quan trọng đã ghim (📌)",
+    row_clear_unpinned_desc: "Giữ lại các mục quan trọng đã ghim",
     btn_clear_now: "Xóa ngay",
     sec_reset: "Khôi phục mặc định",
     row_reset_all: "Đặt lại toàn bộ cài đặt",
@@ -152,12 +153,12 @@ const I18N = {
 
     // Settings About
     about_version: "Phiên bản 2.0.0 (Native Rust Edition)",
-    about_desc: "Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust 🦀 và Tauri v2 ⚡. Hỗ trợ Linux, Windows và macOS.",
+    about_desc: "Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust và Tauri v2. Hỗ trợ Linux, Windows và macOS.",
     about_copyright: "Giữ bản quyền © 2026 ClipMaster Open Source.",
     btn_save_settings: "Đóng & Lưu",
 
     // Card Actions
-    tooltip_pin: "Ghim",
+    tooltip_pin: "Ghim mục",
     tooltip_unpin: "Bỏ ghim",
     tooltip_delete: "Xóa",
     tooltip_edit: "Chỉnh sửa",
@@ -195,29 +196,29 @@ const I18N = {
     tooltip_close: "Close (Esc)",
 
     // Mode Switcher
-    tab_history: "📋 History",
-    tab_notes: "📝 Notes",
+    tab_history: "History",
+    tab_notes: "Notes",
 
     // Search
-    search_placeholder: "Search copied history... (Ctrl+F)",
-    search_notes_placeholder: "Search within notes... (Ctrl+F)",
+    search_placeholder: "Search copied history...",
+    search_notes_placeholder: "Search within notes...",
     tooltip_search_toggle: "Search (Ctrl+F)",
-    tooltip_search_clear: "Close search (Esc)",
+    tooltip_search_clear: "Clear search (Esc)",
 
     // Filters
-    filter_all: "🌟 All",
-    filter_text: "📝 Text",
-    filter_code: "💻 Code",
-    filter_url: "🔗 Links",
-    filter_image: "🖼️ Images",
-    filter_pinned: "📌 Pinned",
+    filter_all: "All",
+    filter_text: "Text",
+    filter_code: "Code",
+    filter_url: "Links",
+    filter_image: "Images",
+    filter_pinned: "Pinned",
 
     // Empty States
     empty_history_title: "No clipboard history yet",
     empty_history_desc: "Copy any text, code snippet, or link (Ctrl + C) to auto-save.",
     empty_history_search: "No matching results found for this query.",
     empty_notes_title: "No notes yet",
-    empty_notes_desc: "Click the (＋) button below to create your first note.",
+    empty_notes_desc: "Click the add button below to create your first note.",
     empty_notes_search: "No matching notes found for this query.",
 
     // Footer
@@ -229,7 +230,7 @@ const I18N = {
     pin_title: "Notes protected by PIN code",
     pin_subtitle: "Please enter your 4-digit PIN to unlock",
     pin_key_clear: "Clear",
-    pin_btn_back: "← Back to History",
+    pin_btn_back: "Back to History",
     pin_err_incorrect: "Incorrect PIN. {attempts} attempts remaining.",
     pin_err_lockout: "Temporarily locked: Please wait {seconds}s",
 
@@ -246,21 +247,21 @@ const I18N = {
     btn_save_note: "Save Note",
 
     // Settings Modal
-    settings_title: "⚙️ ClipMaster Settings",
-    settings_tab_general: "🎨 General",
-    settings_tab_storage: "📋 Storage",
-    settings_tab_shortcut: "⌨️ Shortcuts",
-    settings_tab_security: "🔒 PIN Security",
-    settings_tab_sync: "☁️ Cloud Sync",
-    settings_tab_maintenance: "⚠️ Maintenance",
-    settings_tab_about: "ℹ️ About",
+    settings_title: "ClipMaster Settings",
+    settings_tab_general: "General",
+    settings_tab_storage: "Storage",
+    settings_tab_shortcut: "Shortcuts",
+    settings_tab_security: "PIN Security",
+    settings_tab_sync: "Cloud Sync",
+    settings_tab_maintenance: "Maintenance",
+    settings_tab_about: "About",
 
     // Settings General
     sec_appearance: "Appearance & Interface",
     row_theme: "Color Theme",
     row_theme_desc: "Dark, Light or follow system preferences",
-    theme_dark: "🌙 Dark",
-    theme_light: "☀️ Light",
+    theme_dark: "Dark",
+    theme_light: "Light",
     row_lang: "Display Language",
     row_lang_desc: "Application user interface language",
     sec_system: "System",
@@ -288,7 +289,7 @@ const I18N = {
     sec_shortcut: "System-wide Hotkey",
     row_shortcut: "Global Hotkey",
     row_shortcut_desc: "Press this hotkey anywhere to open ClipMaster",
-    shortcut_hint: "💡 Tip: On Linux & Windows, Super + V (Win + V) provides the most intuitive and standard clipboard experience.",
+    shortcut_hint: "Tip: On Linux & Windows, Super + V (Win + V) provides the most intuitive and standard clipboard experience.",
 
     // Settings Security
     sec_pin_protect: "Protect Notes Section",
@@ -323,7 +324,7 @@ const I18N = {
     // Settings Maintenance
     sec_cleanup: "Data Maintenance",
     row_clear_unpinned: "Clear Unpinned Clips",
-    row_clear_unpinned_desc: "Keep important pinned clips intact (📌)",
+    row_clear_unpinned_desc: "Keep important pinned clips intact",
     btn_clear_now: "Clear Now",
     sec_reset: "Reset Defaults",
     row_reset_all: "Reset All Settings",
@@ -332,12 +333,12 @@ const I18N = {
 
     // Settings About
     about_version: "Version 2.0.0 (Native Rust Edition)",
-    about_desc: "High-performance cross-platform clipboard manager built with Rust 🦀 and Tauri v2 ⚡. Runs on Linux, Windows, and macOS.",
+    about_desc: "High-performance cross-platform clipboard manager built with Rust and Tauri v2. Runs on Linux, Windows, and macOS.",
     about_copyright: "Copyright © 2026 ClipMaster Open Source.",
     btn_save_settings: "Close & Save",
 
     // Card Actions
-    tooltip_pin: "Pin",
+    tooltip_pin: "Pin item",
     tooltip_unpin: "Unpin",
     tooltip_delete: "Delete",
     tooltip_edit: "Edit",
