@@ -389,21 +389,18 @@ class SyncManager:
 
     def push_unpin(self, content_hash: str) -> bool:
         """
-        Đánh dấu soft-delete khi user bỏ ghim một mục.
-        Các máy khác sẽ nhận thay đổi này qua pull_changes_since().
+        Xóa mục đã bỏ ghim khỏi Supabase.
+        Dùng DELETE để Supabase không giữ các dòng thừa (tombstone).
         """
         if not self.is_configured():
             return False
 
         def _unpin():
             try:
-                now = _now_iso()
                 quoted_hash = urllib.parse.quote(content_hash)
                 self._rest_request(
-                    method="PATCH",
+                    method="DELETE",
                     path=f"/pinned_clips?content_hash=eq.{quoted_hash}",
-                    data={"deleted_at": now, "updated_at": now},
-                    extra_headers={"Prefer": "return=minimal"},
                 )
             except Exception as e:
                 print(f"[Sync] push_unpin error: {e}")
@@ -416,50 +413,31 @@ class SyncManager:
     def pull_all(self) -> list[dict]:
         """
         Kéo toàn bộ pinned items đang active từ cloud về.
-        Dùng cho initial sync lần đầu kết nối.
+        Bảo đảm nếu local bị xóa hoặc máy mới cài đặt thì khôi phục đủ 100%.
         """
         if not self.is_configured():
             return []
         try:
             data = self._rest_request(
                 method="GET",
-                path="/pinned_clips?select=*&deleted_at=is.null&order=updated_at.desc",
+                path="/pinned_clips?select=*&order=updated_at.desc",
             )
             return data if isinstance(data, list) else []
         except Exception as e:
             print(f"[Sync] pull_all error: {e}")
             return []
 
-    def pull_changes_since(self, iso_timestamp: str) -> list[dict]:
-        """
-        Kéo chỉ những thay đổi sau lần sync cuối.
-        Bao gồm cả các mục bị soft-delete (để sync bỏ ghim).
-        """
-        if not self.is_configured():
-            return []
-        try:
-            quoted_ts = urllib.parse.quote(iso_timestamp)
-            data = self._rest_request(
-                method="GET",
-                path=f"/pinned_clips?select=*&updated_at=gt.{quoted_ts}",
-            )
-            return data if isinstance(data, list) else []
-        except Exception as e:
-            print(f"[Sync] pull_changes_since error: {e}")
-            return []
-
-    # ── Sync tổng hợp ───────────────────────────
+    # ── Sync hai chiều tổng hợp ─────────────────
 
     def sync_on_startup(self, on_done: Optional[callable] = None) -> tuple[bool, str]:
         """
-        Chạy đồng bộ đầy đủ khi app khởi động hoặc khi bấm Sync Now.
-        Nên gọi trong daemon thread để không block UI.
-
-        1. Pull thay đổi từ cloud về local
-        2. Push local pinned lên cloud (merge)
-        3. Cập nhật last_sync_at (chỉ khi push thành công)
-
-        Trả về (success: bool, message: str).
+        Đồng bộ 2 chiều hoàn chỉnh giữa Local SQLite và Supabase Cloud:
+        1. Kéo toàn bộ mục trên Cloud về Local (Cloud -> Local).
+           Nếu Local chưa có hoặc bị xóa -> Khôi phục và ghim lại ngay!
+        2. So khớp các mục Local với Cloud:
+           - Mục Local nào chưa có trên Cloud mà được ghim mới -> Đẩy lên Cloud (Local -> Cloud).
+           - Mục Local nào đã ghim từ trước nhưng Cloud không còn -> Bỏ ghim ở Local (đồng bộ unpin từ máy khác).
+        3. Cập nhật last_sync_at.
         """
         if not self.is_configured():
             if on_done:
@@ -470,29 +448,61 @@ class SyncManager:
         success = True
         pulled = 0
         pushed = 0
+        unpinned = 0
 
         try:
-            last_sync = self.db.get_setting(
-                "last_sync_at", "1970-01-01T00:00:00+00:00"
-            )
-
-            # 1. Pull changes từ cloud
+            import time
+            last_sync_str = self.db.get_setting("last_sync_at", "0")
             try:
-                changes = self.pull_changes_since(last_sync)
-                for item in changes:
-                    if item.get("deleted_at"):
-                        self.db.unpin_by_hash(item["content_hash"])
-                    else:
-                        self.db.pin_or_add_by_hash(item)
-                        pulled += 1
-            except Exception as e:
-                print(f"[Sync] pull error: {e}")
-                error_msg = str(e)
-                success = False
+                last_sync_ts = float(last_sync_str)
+            except ValueError:
+                try:
+                    dt = datetime.fromisoformat(last_sync_str.replace("Z", "+00:00"))
+                    last_sync_ts = dt.timestamp()
+                except Exception:
+                    last_sync_ts = 0.0
 
-            # 2. Push local pinned lên cloud
+            # 1. Kéo toàn bộ mục trên Cloud về (Cloud -> Local)
+            cloud_items = self.pull_all()
+            cloud_hashes = {
+                item["content_hash"]: item
+                for item in cloud_items
+                if "content_hash" in item
+            }
+
+            for c_hash, item in cloud_hashes.items():
+                if self.db.pin_or_add_by_hash(item):
+                    pulled += 1
+
+            # 2. Xử lý các mục đang ghim ở Local
             local_pinned = self.db.get_pinned_for_sync()
-            if local_pinned:
+            to_push = []
+
+            for clip in local_pinned:
+                l_hash = clip.get("content_hash")
+                if not l_hash:
+                    continue
+
+                if l_hash in cloud_hashes:
+                    # Đã có trên cả 2 bên -> đồng bộ
+                    continue
+
+                # Mục này có ở Local nhưng KHÔNG có trên Cloud:
+                clip_updated_at = clip.get("updated_at", 0.0)
+
+                if last_sync_ts > 0 and clip_updated_at <= last_sync_ts:
+                    # Clip này đã tồn tại trước lần sync trước, nhưng giờ Cloud không còn
+                    # -> nghĩa là máy khác đã bỏ ghim / xóa khỏi Cloud -> unpin ở Local!
+                    self.db.unpin_by_hash(l_hash)
+                    unpinned += 1
+                else:
+                    # Clip này được ghim sau lần sync trước (hoặc chưa từng sync)
+                    # -> đây là mục mới ở Local -> đẩy lên Cloud!
+                    to_push.append(clip)
+
+            # 3. Đẩy các mục local mới lên Cloud (Local -> Cloud)
+            if to_push:
+                now = _now_iso()
                 records = [
                     {
                         "content_hash": clip["content_hash"],
@@ -501,10 +511,10 @@ class SyncManager:
                         "char_count": clip.get("char_count", 0),
                         "line_count": clip.get("line_count", 0),
                         "created_at": _ts_to_iso(clip.get("created_at", 0)),
-                        "updated_at": _ts_to_iso(clip.get("updated_at", 0)),
+                        "updated_at": now,
                         "deleted_at": None,
                     }
-                    for clip in local_pinned
+                    for clip in to_push
                 ]
                 try:
                     self._rest_request(
@@ -519,10 +529,18 @@ class SyncManager:
                     error_msg = str(e)
                     success = False
 
-            # 3. Chỉ cập nhật last_sync_at nếu không gặp lỗi nghiêm trọng
+            # Cập nhật thời điểm sync
             if success:
-                self.db.set_setting("last_sync_at", _now_iso())
-                msg = f"Đồng bộ thành công (↓{pulled}, ↑{pushed})"
+                self.db.set_setting("last_sync_at", str(time.time()))
+                msg_parts = []
+                if pulled:
+                    msg_parts.append(f"↓{pulled}")
+                if pushed:
+                    msg_parts.append(f"↑{pushed}")
+                if unpinned:
+                    msg_parts.append(f"✕{unpinned}")
+                change_str = f" ({', '.join(msg_parts)})" if msg_parts else ""
+                msg = f"Đồng bộ thành công{change_str}"
             else:
                 msg = f"Đồng bộ gặp lỗi: {error_msg}"
 

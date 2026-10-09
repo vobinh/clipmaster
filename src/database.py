@@ -324,6 +324,7 @@ class Database:
             )
             existing = cur.fetchone()
 
+            changed = False
             if existing:
                 # Chỉ cập nhật is_pinned nếu chưa ghim
                 if existing["is_pinned"] == 0:
@@ -331,6 +332,7 @@ class Database:
                         "UPDATE clips SET is_pinned = 1, updated_at = ? WHERE id = ?",
                         (updated_at, existing["id"])
                     )
+                    changed = True
             else:
                 # Thêm mục mới từ cloud
                 char_count = remote_item.get("char_count", len(content) if content else 0)
@@ -345,7 +347,9 @@ class Database:
                     (clip_type, content, content_hash,
                      char_count, line_count, created_at, updated_at)
                 )
+                changed = True
             conn.commit()
+            return changed
 
     def unpin_by_hash(self, content_hash: str) -> None:
         """

@@ -132,7 +132,10 @@ class ClipMasterApplication(Adw.Application):
         # Khởi tạo SyncManager và chạy startup sync trong nền
         self.sync_mgr = SyncManager(db=self.db)
         if self.sync_mgr.is_configured():
-            self.sync_mgr.run_startup_sync_async()
+            def _on_startup_sync(success, msg):
+                if success and hasattr(self, "window") and self.window:
+                    GLib.idle_add(self.window.reload_history)
+            self.sync_mgr.run_startup_sync_async(on_done=_on_startup_sync)
 
         # Start IPC socket server for single-instance commands
         self.ipc_server = start_ipc_server(self._handle_ipc_command)

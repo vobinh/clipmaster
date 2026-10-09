@@ -424,14 +424,22 @@ class MainWindow(Adw.ApplicationWindow):
         if self.sync_mgr and clip:
             content_hash = clip.get("content_hash", "")
             if is_pinned:
-                self.sync_mgr.push_pin(clip)
+                updated_clip = self.db.get_clip_by_id(clip_id) or clip
+                self.sync_mgr.push_pin(updated_clip)
             else:
                 self.sync_mgr.push_unpin(content_hash)
 
     def _delete_clip(self, clip_id: int):
+        clip = self.db.get_clip_by_id(clip_id)
+        is_pinned = clip.get("is_pinned", 0) if clip else 0
+        content_hash = clip.get("content_hash", "") if clip else ""
+
         self.db.delete_clip(clip_id)
         self.show_toast(t("toast_deleted", self.lang))
         self.reload_history()
+
+        if self.sync_mgr and is_pinned and content_hash:
+            self.sync_mgr.push_unpin(content_hash)
 
     def _confirm_clear_unpinned(self, btn):
         deleted = self.db.clear_unpinned()
