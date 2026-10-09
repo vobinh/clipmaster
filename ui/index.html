@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipMaster</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Bar -->
+    <header class="header-bar" data-tauri-drag-region>
+      <div class="header-left">
+        <span class="status-indicator active" id="status-indicator"></span>
+      </div>
+      <div class="header-center">
+        <h1 class="app-title">ClipMaster</h1>
+        <span class="app-subtitle" id="app-subtitle">Lịch sử Clipboard (Win + V)</span>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" id="btn-clear" title="Xóa toàn bộ mục chưa ghim">🗑️</button>
+        <button class="icon-btn" id="btn-theme" title="Chuyển chế độ Sáng / Tối">🌙</button>
+        <button class="icon-btn" id="btn-settings" title="Cài đặt">⚙️</button>
+        <button class="icon-btn close-btn" id="btn-close" title="Đóng (Esc)">✕</button>
+      </div>
+    </header>
+
+    <!-- Mode Switcher (History vs Notes) -->
+    <div class="mode-switcher-container">
+      <div class="mode-switcher">
+        <button class="mode-btn active" id="tab-history">📋 Lịch sử</button>
+        <button class="mode-btn" id="tab-notes">📝 Ghi chú</button>
+      </div>
+    </div>
+
+    <!-- Combined Search & Filter Bar (1 Single Row) -->
+    <div class="search-filter-row">
+      <!-- Search Expandable Component -->
+      <div class="search-wrapper" id="search-wrapper">
+        <button class="search-toggle-chip" id="btn-search-toggle" title="Tìm kiếm (Ctrl+F)">🔍</button>
+        <div class="search-input-box" id="search-input-box">
+          <input type="text" id="search-input" placeholder="Tìm kiếm nội dung đã copy... (Ctrl+F)" autocomplete="off" />
+          <button class="search-clear-btn" id="btn-search-clear" title="Đóng tìm kiếm (Esc)">✕</button>
+        </div>
+      </div>
+
+      <!-- Category Filter Chips -->
+      <div class="filter-chips-scroll" id="filter-chips-container">
+        <!-- History Filters -->
+        <div class="filter-chips-group" id="history-filters">
+          <button class="filter-chip active" data-filter="all">🌟 Tất cả</button>
+          <button class="filter-chip" data-filter="text">📝 Văn bản</button>
+          <button class="filter-chip" data-filter="code">💻 Code</button>
+          <button class="filter-chip" data-filter="url">🔗 Link</button>
+          <button class="filter-chip" data-filter="image">🖼️ Ảnh</button>
+          <button class="filter-chip" data-filter="pinned">📌 Đã ghim</button>
+        </div>
+
+        <!-- Notes Filters -->
+        <div class="filter-chips-group hidden" id="notes-filters">
+          <button class="filter-chip active" data-filter="all">🌟 Tất cả</button>
+          <button class="filter-chip" data-filter="pinned">📌 Đã ghim</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+      <!-- Items List -->
+      <div class="items-list" id="items-list">
+        <!-- Dynamic Cards Inserted Here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state hidden" id="empty-state">
+        <div class="empty-icon" id="empty-icon">📋</div>
+        <h3 class="empty-title" id="empty-title">Chưa có nội dung sao chép nào</h3>
+        <p class="empty-desc" id="empty-desc">Sao chép văn bản, liên kết hoặc hình ảnh bất kỳ (Ctrl + C) để lưu vào đây.</p>
+      </div>
+
+      <!-- PIN Security Lock Screen -->
+      <div class="pin-lock-screen hidden" id="pin-lock-screen">
+        <div class="pin-lock-card">
+          <div class="pin-icon">🔒</div>
+          <h2 class="pin-title">Ghi chú được bảo vệ bằng mã PIN</h2>
+          <p class="pin-subtitle" id="pin-subtitle">Vui lòng nhập mã PIN 4 chữ số để mở khóa</p>
+
+          <!-- 4 Dots Indicator -->
+          <div class="pin-dots-container">
+            <span class="pin-dot" id="dot-0"></span>
+            <span class="pin-dot" id="dot-1"></span>
+            <span class="pin-dot" id="dot-2"></span>
+            <span class="pin-dot" id="dot-3"></span>
+          </div>
+
+          <div class="pin-error-msg hidden" id="pin-error-msg"></div>
+
+          <!-- Numeric Keypad (3x4 Grid) -->
+          <div class="pin-keypad" id="pin-keypad">
+            <button class="key-btn" data-key="1">1</button>
+            <button class="key-btn" data-key="2">2</button>
+            <button class="key-btn" data-key="3">3</button>
+            <button class="key-btn" data-key="4">4</button>
+            <button class="key-btn" data-key="5">5</button>
+            <button class="key-btn" data-key="6">6</button>
+            <button class="key-btn" data-key="7">7</button>
+            <button class="key-btn" data-key="8">8</button>
+            <button class="key-btn" data-key="9">9</button>
+            <button class="key-btn action-key" data-action="clear">Xóa hết</button>
+            <button class="key-btn" data-key="0">0</button>
+            <button class="key-btn action-key" data-action="backspace">⌫</button>
+          </div>
+
+          <button class="back-btn" id="btn-pin-back">← Quay lại Lịch sử</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Floating Action Button (FAB) for Notes -->
+    <button class="fab-btn hidden" id="btn-fab-create-note" title="Tạo ghi chú mới (Ctrl+N)">＋</button>
+
+    <!-- Modal Note Editor -->
+    <div class="modal-overlay hidden" id="modal-note">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" id="modal-note-title">Tạo ghi chú mới</h3>
+          <button class="icon-btn close-btn" id="btn-close-note-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="note-id" value="" />
+          <div class="form-group">
+            <label class="form-label">Tiêu đề (Tùy chọn)</label>
+            <input type="text" class="form-input" id="note-input-title" placeholder="Ví dụ: Tài khoản, Ý tưởng, Lệnh Git..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nội dung ghi chú *</label>
+            <textarea class="form-textarea" id="note-input-content" placeholder="Nhập nội dung ghi chú ở đây..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Màu đánh dấu</label>
+            <div class="color-picker-row" id="note-color-picker">
+              <button class="color-dot-btn selected" data-color="" style="background: #64748b;" title="Mặc định"></button>
+              <button class="color-dot-btn" data-color="#ef4444" style="background: #ef4444;" title="Đỏ"></button>
+              <button class="color-dot-btn" data-color="#f59e0b" style="background: #f59e0b;" title="Cam"></button>
+              <button class="color-dot-btn" data-color="#10b981" style="background: #10b981;" title="Xanh lá"></button>
+              <button class="color-dot-btn" data-color="#3b82f6" style="background: #3b82f6;" title="Xanh dương"></button>
+              <button class="color-dot-btn" data-color="#8b5cf6" style="background: #8b5cf6;" title="Tím"></button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="btn-cancel-note">Hủy</button>
+          <button class="btn-primary" id="btn-save-note">Lưu ghi chú</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Settings -->
+    <div class="modal-overlay hidden" id="modal-settings">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">⚙️ Cài đặt ClipMaster</h3>
+          <button class="icon-btn close-btn" id="btn-close-settings-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Số lượng mục lịch sử tối đa</label>
+            <input type="number" class="form-input" id="setting-max-history" min="50" max="1000" value="200" />
+          </div>
+          <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
+            <label class="form-label">Tự động dán khi chọn (Auto Paste)</label>
+            <input type="checkbox" id="setting-auto-paste" checked />
+          </div>
+          <hr style="border: none; border-top: 1px solid var(--card-border);" />
+          <div class="form-group">
+            <label class="form-label">Bảo mật PIN Ghi chú (4 chữ số)</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="password" class="form-input" id="setting-new-pin" maxlength="4" placeholder="Mã PIN mới (4 số)" style="flex: 1;" />
+              <button class="btn-primary" id="btn-set-pin" style="padding: 6px 10px;">Đặt PIN</button>
+              <button class="btn-secondary" id="btn-disable-pin" style="padding: 6px 10px;">Tắt PIN</button>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted);" id="setting-pin-status">Trạng thái: Chưa bật</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-save-settings">Hoàn tất</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Đã sao chép vào bộ nhớ tạm!</div>
+
+    <!-- Status Bar -->
+    <footer class="footer-bar">
+      <span class="footer-status" id="footer-status">Tổng cộng: 0 mục (0 đã ghim)</span>
+      <span class="footer-hint">↑↓ Chọn • Enter Dán • Del Xóa</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

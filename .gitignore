@@ -7,6 +7,8 @@ parts/
 stage/
 prime/
 .snapcraft/
+src-tauri/target/
+target/
 
 # Python cache & bytecode
 __pycache__/
