@@ -1,6 +1,6 @@
 /**
  * ClipMaster - Cross-Platform Modern Frontend Controller
- * Tauri v2 IPC Bridge & Interactive UI Logic
+ * Tauri v2 IPC Bridge & Interactive UI Logic & i18n
  */
 
 // ── IPC Abstraction Layer ──────────────────────────────────────────
@@ -51,7 +51,8 @@ const mockStore = {
     auto_paste: "1",
     theme_mode: "dark",
     notes_pin_enabled: "0",
-    notes_pin_hash: ""
+    notes_pin_hash: "",
+    language: "vi"
   }
 };
 
@@ -147,6 +148,127 @@ async function mockInvoke(cmd, args) {
   }
 }
 
+// ── i18n Translation Engine ─────────────────────────────────────────
+let currentLang = 'vi';
+
+function t(key, params = {}) {
+  const dict = (window.I18N && window.I18N[currentLang]) || (window.I18N && window.I18N['vi']) || {};
+  let text = dict[key] !== undefined ? dict[key] : key;
+  if (typeof text === 'string') {
+    Object.keys(params).forEach(param => {
+      text = text.replace(new RegExp(`\\{${param}\\}`, 'g'), params[param]);
+    });
+  }
+  return text;
+}
+
+function applyLanguage(lang) {
+  currentLang = (lang === 'en' || lang === 'vi') ? lang : 'vi';
+  document.documentElement.setAttribute('lang', currentLang);
+
+  // 1. Static text elements with data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key) el.textContent = t(key);
+  });
+
+  // 2. Tooltips with data-i18n-title
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (key) el.title = t(key);
+  });
+
+  // 3. Placeholders with data-i18n-placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key) el.placeholder = t(key);
+  });
+
+  // 4. Dynamic Mode Subtitle & Search Placeholder
+  if (state.mode === 'notes') {
+    DOM.appSubtitle.textContent = t('app_subtitle_notes');
+    DOM.searchInput.placeholder = t('search_notes_placeholder');
+  } else {
+    DOM.appSubtitle.textContent = t('app_subtitle');
+    DOM.searchInput.placeholder = t('search_placeholder');
+  }
+
+  // 5. Dynamic Empty State Texts
+  if (state.currentItems.length === 0) {
+    if (state.mode === 'history') {
+      DOM.emptyTitle.textContent = t('empty_history_title');
+      DOM.emptyDesc.textContent = state.searchQuery 
+        ? t('empty_history_search') 
+        : t('empty_history_desc');
+    } else {
+      DOM.emptyTitle.textContent = t('empty_notes_title');
+      DOM.emptyDesc.textContent = state.searchQuery 
+        ? t('empty_notes_search') 
+        : t('empty_notes_desc');
+    }
+  }
+
+  // 6. Security PIN Settings status label
+  const elPinStatus = document.getElementById('setting-pin-status');
+  const elPinToggle = document.getElementById('setting-pin-toggle');
+  if (elPinStatus && elPinToggle) {
+    elPinStatus.textContent = elPinToggle.checked ? t('pin_status_on') : t('pin_status_off');
+  }
+
+  // 7. Select options text in settings
+  const elThemeDark = document.querySelector('#setting-theme-mode option[value="dark"]');
+  const elThemeLight = document.querySelector('#setting-theme-mode option[value="light"]');
+  if (elThemeDark) elThemeDark.textContent = t('theme_dark');
+  if (elThemeLight) elThemeLight.textContent = t('theme_light');
+
+  const historyOpts = {
+    "50": t('opt_50_items'),
+    "100": t('opt_100_items'),
+    "200": t('opt_200_items'),
+    "500": t('opt_500_items'),
+    "1000": t('opt_1000_items')
+  };
+  Object.keys(historyOpts).forEach(val => {
+    const opt = document.querySelector(`#setting-max-history option[value="${val}"]`);
+    if (opt) opt.textContent = historyOpts[val];
+  });
+
+  const pinTimeoutOpts = {
+    "60": t('pin_time_60'),
+    "300": t('pin_time_300'),
+    "900": t('pin_time_900'),
+    "1800": t('pin_time_1800'),
+    "0": t('pin_time_close')
+  };
+  Object.keys(pinTimeoutOpts).forEach(val => {
+    const opt = document.querySelector(`#setting-pin-timeout option[value="${val}"]`);
+    if (opt) opt.textContent = pinTimeoutOpts[val];
+  });
+
+  const syncDirOpts = {
+    "bidirectional": t('sync_dir_both'),
+    "push_only": t('sync_dir_push'),
+    "pull_only": t('sync_dir_pull')
+  };
+  Object.keys(syncDirOpts).forEach(val => {
+    const opt = document.querySelector(`#setting-sync-direction option[value="${val}"]`);
+    if (opt) opt.textContent = syncDirOpts[val];
+  });
+
+  // 8. Sync setting language dropdown value
+  const elLang = document.getElementById('setting-language');
+  if (elLang) elLang.value = currentLang;
+
+  // 9. Re-render current items & footer status for localized time badges & tooltips
+  if (state.mode === 'history') {
+    if (state.currentItems.length > 0) renderHistoryCards(state.currentItems);
+    updateFooterStatusHistory();
+  } else {
+    if (state.currentItems.length > 0) renderNoteCards(state.currentItems);
+    updateFooterStatusNotes();
+  }
+}
+
 // ── Application State ──────────────────────────────────────────────
 const state = {
   mode: 'history', // 'history' | 'notes'
@@ -236,10 +358,10 @@ function formatRelativeTime(timestamp) {
   const now = Date.now() / 1000;
   const diff = Math.max(0, now - timestamp);
 
-  if (diff < 15) return "Vừa xong";
-  if (diff < 60) return `${Math.floor(diff)} giây trước`;
-  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+  if (diff < 15) return t('time_just_now');
+  if (diff < 60) return t('time_secs_ago', { secs: Math.floor(diff) });
+  if (diff < 3600) return t('time_mins_ago', { mins: Math.floor(diff / 60) });
+  if (diff < 86400) return t('time_hours_ago', { hours: Math.floor(diff / 3600) });
   
   const d = new Date(timestamp * 1000);
   const pad = n => n.toString().padStart(2, '0');
@@ -251,7 +373,7 @@ function showToast(message) {
   DOM.toast.classList.add('show');
   setTimeout(() => {
     DOM.toast.classList.remove('show');
-  }, 1600);
+  }, 1800);
 }
 
 // ── Data Loading & Rendering ───────────────────────────────────────
@@ -268,11 +390,19 @@ async function loadClips() {
 
     state.currentItems = clips || [];
     renderHistoryCards(state.currentItems);
-
-    const stats = await invoke('get_stats');
-    DOM.footerStatus.textContent = `Tổng cộng: ${stats?.total || 0} mục (${stats?.pinned || 0} đã ghim)`;
+    await updateFooterStatusHistory();
   } catch (err) {
     console.error("Failed to load clips:", err);
+  }
+}
+
+async function updateFooterStatusHistory() {
+  try {
+    const stats = await invoke('get_stats');
+    DOM.footerStatus.textContent = t('footer_clips_status', { total: stats?.total || 0, pinned: stats?.pinned || 0 });
+  } catch (e) {
+    const pinned = state.currentItems.filter(c => c.is_pinned).length;
+    DOM.footerStatus.textContent = t('footer_clips_status', { total: state.currentItems.length, pinned });
   }
 }
 
@@ -297,12 +427,15 @@ async function loadNotes() {
 
     state.currentItems = notes || [];
     renderNoteCards(state.currentItems);
-
-    const pinnedCount = state.currentItems.filter(n => n.is_pinned).length;
-    DOM.footerStatus.textContent = `Ghi chú: ${state.currentItems.length} mục (${pinnedCount} đã ghim)`;
+    updateFooterStatusNotes();
   } catch (err) {
     console.error("Failed to load notes:", err);
   }
+}
+
+function updateFooterStatusNotes() {
+  const pinnedCount = state.currentItems.filter(n => n.is_pinned).length;
+  DOM.footerStatus.textContent = t('footer_notes_status', { total: state.currentItems.length, pinned: pinnedCount });
 }
 
 function renderHistoryCards(items) {
@@ -311,10 +444,10 @@ function renderHistoryCards(items) {
 
   if (items.length === 0) {
     DOM.emptyState.classList.remove('hidden');
-    DOM.emptyTitle.textContent = "Chưa có nội dung sao chép nào";
+    DOM.emptyTitle.textContent = t('empty_history_title');
     DOM.emptyDesc.textContent = state.searchQuery 
-      ? "Không tìm thấy kết quả phù hợp với từ khóa." 
-      : "Sao chép bất kỳ văn bản, code hoặc liên kết (Ctrl + C) để lưu tự động.";
+      ? t('empty_history_search') 
+      : t('empty_history_desc');
     return;
   }
 
@@ -350,10 +483,10 @@ function renderHistoryCards(items) {
       </div>
       ${previewHtml}
       <div class="card-actions">
-        <button class="card-btn ${item.is_pinned ? 'pinned' : ''}" data-action="pin" title="${item.is_pinned ? 'Bỏ ghim' : 'Ghim'}">
+        <button class="card-btn ${item.is_pinned ? 'pinned' : ''}" data-action="pin" title="${item.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
           ${item.is_pinned ? '📌' : '📍'}
         </button>
-        <button class="card-btn" data-action="delete" title="Xóa">🗑️</button>
+        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">🗑️</button>
       </div>
     `;
 
@@ -388,10 +521,10 @@ function renderNoteCards(notes) {
 
   if (notes.length === 0) {
     DOM.emptyState.classList.remove('hidden');
-    DOM.emptyTitle.textContent = "Chưa có ghi chú nào";
+    DOM.emptyTitle.textContent = t('empty_notes_title');
     DOM.emptyDesc.textContent = state.searchQuery 
-      ? "Không tìm thấy ghi chú phù hợp với từ khóa." 
-      : "Nhấn nút (＋) ở góc dưới để tạo ghi chú mới.";
+      ? t('empty_notes_search') 
+      : t('empty_notes_desc');
     return;
   }
 
@@ -419,11 +552,11 @@ function renderNoteCards(notes) {
       ${titleHtml}
       <div class="card-content">${escapeHtml(note.content)}</div>
       <div class="card-actions">
-        <button class="card-btn" data-action="edit" title="Chỉnh sửa">✏️</button>
-        <button class="card-btn ${note.is_pinned ? 'pinned' : ''}" data-action="pin" title="${note.is_pinned ? 'Bỏ ghim' : 'Ghim'}">
+        <button class="card-btn" data-action="edit" title="${t('tooltip_edit')}">✏️</button>
+        <button class="card-btn ${note.is_pinned ? 'pinned' : ''}" data-action="pin" title="${note.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
           ${note.is_pinned ? '📌' : '📍'}
         </button>
-        <button class="card-btn" data-action="delete" title="Xóa">🗑️</button>
+        <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">🗑️</button>
       </div>
     `;
 
@@ -432,7 +565,7 @@ function renderNoteCards(notes) {
       if (e.target.closest('[data-action]')) return;
       selectCard(index);
       await invoke('copy_text', { text: note.content });
-      showToast("Đã dán ghi chú!");
+      showToast(t('toast_note_pasted'));
     });
 
     // Edit button
@@ -475,7 +608,7 @@ function selectCard(index) {
 async function copyItem(id) {
   try {
     await invoke('copy_clip', { id });
-    showToast("Đã sao chép vào bộ nhớ tạm!");
+    showToast(t('toast_copied'));
   } catch (err) {
     console.error("Copy failed:", err);
   }
@@ -561,7 +694,8 @@ function setupModeSwitcher() {
     DOM.historyFilters.classList.remove('hidden');
     DOM.notesFilters.classList.add('hidden');
     DOM.btnFabCreateNote.classList.add('hidden');
-    DOM.appSubtitle.textContent = "Lịch sử Clipboard (Win + V)";
+    DOM.appSubtitle.textContent = t('app_subtitle');
+    DOM.searchInput.placeholder = t('search_placeholder');
     hidePinLockScreen();
     loadClips();
   });
@@ -574,7 +708,8 @@ function setupModeSwitcher() {
     DOM.historyFilters.classList.add('hidden');
     DOM.notesFilters.classList.remove('hidden');
     DOM.btnFabCreateNote.classList.remove('hidden');
-    DOM.appSubtitle.textContent = "Ghi chú bảo mật & Cá nhân";
+    DOM.appSubtitle.textContent = t('app_subtitle_notes');
+    DOM.searchInput.placeholder = t('search_notes_placeholder');
     loadNotes();
   });
 }
@@ -637,7 +772,7 @@ async function verifyPinBuffer() {
     if (state.pinFailedAttempts >= 3) {
       startLockoutTimer(30);
     } else {
-      DOM.pinErrorMsg.textContent = `Sai mã PIN. Còn lại ${3 - state.pinFailedAttempts} lần thử.`;
+      DOM.pinErrorMsg.textContent = t('pin_err_incorrect', { attempts: 3 - state.pinFailedAttempts });
       DOM.pinErrorMsg.classList.remove('hidden');
       setTimeout(() => {
         state.pinBuffer = '';
@@ -658,12 +793,12 @@ function startLockoutTimer(seconds) {
       clearInterval(state.lockoutTimer);
       state.pinFailedAttempts = 0;
       DOM.pinErrorMsg.classList.add('hidden');
-      DOM.pinSubtitle.textContent = "Vui lòng nhập mã PIN 4 chữ số để mở khóa";
+      DOM.pinSubtitle.textContent = t('pin_subtitle');
       DOM.pinKeypad.querySelectorAll('button').forEach(b => b.disabled = false);
       state.pinBuffer = '';
       updatePinDots();
     } else {
-      DOM.pinErrorMsg.textContent = `Khóa tạm thời: Vui lòng đợi ${state.lockoutRemaining}s`;
+      DOM.pinErrorMsg.textContent = t('pin_err_lockout', { seconds: state.lockoutRemaining });
       DOM.pinErrorMsg.classList.remove('hidden');
     }
   }, 1000);
@@ -697,13 +832,13 @@ function setupPinKeypad() {
 function openNoteModal(note = null) {
   DOM.modalNote.classList.remove('hidden');
   if (note) {
-    DOM.modalNoteTitle.textContent = "Chỉnh sửa ghi chú";
+    DOM.modalNoteTitle.textContent = t('modal_note_edit');
     DOM.noteId.value = note.id;
     DOM.noteInputTitle.value = note.title || '';
     DOM.noteInputContent.value = note.content || '';
     state.activeNoteColor = note.color || '';
   } else {
-    DOM.modalNoteTitle.textContent = "Tạo ghi chú mới";
+    DOM.modalNoteTitle.textContent = t('modal_note_new');
     DOM.noteId.value = '';
     DOM.noteInputTitle.value = '';
     DOM.noteInputContent.value = '';
@@ -742,7 +877,7 @@ function setupNoteModal() {
   DOM.btnSaveNote.addEventListener('click', async () => {
     const content = DOM.noteInputContent.value.trim();
     if (!content) {
-      alert("Vui lòng nhập nội dung ghi chú!");
+      alert(t('alert_note_content_empty'));
       return;
     }
 
@@ -753,11 +888,11 @@ function setupNoteModal() {
     try {
       await invoke('save_note', { id, title, content, color });
       closeNoteModal();
-      showToast("Đã lưu ghi chú thành công!");
+      showToast(t('toast_note_saved'));
       loadNotes();
     } catch (err) {
       console.error("Save note failed:", err);
-      alert("Lỗi khi lưu ghi chú: " + err);
+      alert("Error: " + err);
     }
   });
 }
@@ -775,7 +910,7 @@ async function openSettingsModal() {
 
   // General tab
   const themeMode = settings.theme_mode || 'dark';
-  const language = settings.language || 'vi';
+  const language = settings.language || currentLang || 'vi';
   const autostart = settings.autostart === '1';
 
   const elTheme = document.getElementById('setting-theme-mode');
@@ -814,7 +949,7 @@ async function openSettingsModal() {
   if (elPinToggle) elPinToggle.checked = pinEnabled;
   if (elPinTimeout) elPinTimeout.value = pinTimeout;
   if (elPinStatus) {
-    elPinStatus.textContent = pinEnabled ? "Trạng thái: ĐÃ BẬT bảo vệ PIN" : "Trạng thái: Chưa bật";
+    elPinStatus.textContent = pinEnabled ? t('pin_status_on') : t('pin_status_off');
     elPinStatus.style.color = pinEnabled ? "var(--success-color)" : "var(--text-muted)";
   }
 
@@ -868,6 +1003,17 @@ function setupSettingsModal() {
     });
   }
 
+  // Language switch inside settings immediately reflects!
+  const elLang = document.getElementById('setting-language');
+  if (elLang) {
+    elLang.addEventListener('change', async () => {
+      const newLang = elLang.value;
+      applyLanguage(newLang);
+      await invoke('set_setting', { key: 'language', value: newLang });
+      showToast(t('toast_settings_saved'));
+    });
+  }
+
   // PIN Save
   const btnSetPin = document.getElementById('btn-set-pin');
   const elNewPin = document.getElementById('setting-new-pin');
@@ -875,7 +1021,7 @@ function setupSettingsModal() {
     btnSetPin.addEventListener('click', async () => {
       const pin = elNewPin.value.trim();
       if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-        alert("Mã PIN phải gồm đúng 4 chữ số (0-9)!");
+        alert(t('alert_pin_length'));
         return;
       }
       await invoke('set_notes_pin', { pin });
@@ -883,11 +1029,11 @@ function setupSettingsModal() {
       const elPinStatus = document.getElementById('setting-pin-status');
       const elPinToggle = document.getElementById('setting-pin-toggle');
       if (elPinStatus) {
-        elPinStatus.textContent = "Trạng thái: ĐÃ BẬT bảo vệ PIN";
+        elPinStatus.textContent = t('pin_status_on');
         elPinStatus.style.color = "var(--success-color)";
       }
       if (elPinToggle) elPinToggle.checked = true;
-      showToast("Đã lưu mã PIN bảo mật!");
+      showToast(t('toast_pin_saved'));
     });
   }
 
@@ -900,12 +1046,12 @@ function setupSettingsModal() {
         await invoke('disable_notes_pin');
         state.notesUnlocked = true;
         if (elPinStatus) {
-          elPinStatus.textContent = "Trạng thái: Chưa bật";
+          elPinStatus.textContent = t('pin_status_off');
           elPinStatus.style.color = "var(--text-muted)";
         }
-        showToast("Đã tắt bảo vệ bằng mã PIN!");
+        showToast(t('toast_pin_disabled'));
       } else {
-        alert("Vui lòng nhập 4 chữ số vào ô bên dưới và nhấn 'Lưu mã PIN' để kích hoạt.");
+        alert(t('alert_pin_enter_first'));
         elPinToggle.checked = false;
         const elPinInput = document.getElementById('setting-new-pin');
         if (elPinInput) elPinInput.focus();
@@ -923,7 +1069,7 @@ function setupSettingsModal() {
         const msg = await invoke('test_sync_connection');
         showToast(msg);
       } catch (err) {
-        alert("Lỗi kết nối máy chủ đồng bộ: " + err);
+        alert("Sync connection error: " + err);
       }
     });
   }
@@ -932,9 +1078,9 @@ function setupSettingsModal() {
   const btnSettingsClear = document.getElementById('btn-settings-clear-unpinned');
   if (btnSettingsClear) {
     btnSettingsClear.addEventListener('click', async () => {
-      if (confirm("Bạn có chắc chắn muốn xóa tất cả lịch sử chưa ghim?")) {
+      if (confirm(t('confirm_clear_unpinned'))) {
         const removed = await invoke('clear_unpinned');
-        showToast(`Đã dọn dẹp ${removed} mục.`);
+        showToast(t('toast_cleaned', { count: removed }));
         await loadClips();
       }
     });
@@ -944,9 +1090,10 @@ function setupSettingsModal() {
   const btnReset = document.getElementById('btn-reset-defaults');
   if (btnReset) {
     btnReset.addEventListener('click', async () => {
-      if (confirm("Khôi phục toàn bộ cài đặt về trạng thái ban đầu?")) {
+      if (confirm(t('confirm_reset_settings'))) {
         await invoke('reset_settings');
-        showToast("Đã khôi phục cài đặt gốc!");
+        applyLanguage('vi');
+        showToast(t('toast_defaults_restored'));
         closeSettingsModal();
         await loadClips();
       }
@@ -970,7 +1117,11 @@ function setupSettingsModal() {
     const elSyncDirection = document.getElementById('setting-sync-direction');
 
     if (elTheme) await invoke('set_setting', { key: 'theme_mode', value: elTheme.value });
-    if (elLang) await invoke('set_setting', { key: 'language', value: elLang.value });
+    if (elLang) {
+      const langVal = elLang.value;
+      applyLanguage(langVal);
+      await invoke('set_setting', { key: 'language', value: langVal });
+    }
     if (elAutostart) await invoke('set_autostart', { enabled: elAutostart.checked });
     if (elAutoRecord) await invoke('set_setting', { key: 'auto_record', value: elAutoRecord.checked ? '1' : '0' });
     if (elAutoPaste) await invoke('set_setting', { key: 'auto_paste', value: elAutoPaste.checked ? '1' : '0' });
@@ -984,7 +1135,7 @@ function setupSettingsModal() {
     if (elSyncDirection) await invoke('set_setting', { key: 'sync_direction', value: elSyncDirection.value });
 
     closeSettingsModal();
-    showToast("Đã lưu toàn bộ cài đặt!");
+    showToast(t('toast_settings_saved'));
   });
 }
 
@@ -1066,7 +1217,7 @@ function setupKeyboardNavigation() {
           await copyItem(item.id);
         } else {
           await invoke('copy_text', { text: item.content });
-          showToast("Đã dán ghi chú!");
+          showToast(t('toast_note_pasted'));
         }
       }
     } else if (e.key === 'Delete') {
@@ -1091,9 +1242,9 @@ function setupHeaderActions() {
   });
 
   DOM.btnClear.addEventListener('click', async () => {
-    if (confirm("Bạn có chắc chắn muốn xóa tất cả các mục lịch sử chưa được ghim?")) {
+    if (confirm(t('confirm_clear_unpinned'))) {
       const removed = await invoke('clear_unpinned');
-      showToast(`Đã dọn dẹp ${removed} mục.`);
+      showToast(t('toast_cleaned', { count: removed }));
       await loadClips();
     }
   });
@@ -1161,6 +1312,15 @@ async function init() {
     DOM.btnTheme.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
   } catch (e) {
     console.error("Theme load error:", e);
+  }
+
+  // Load saved language
+  try {
+    const savedLang = await invoke('get_setting', { key: 'language', default_val: 'vi' });
+    applyLanguage(savedLang || 'vi');
+  } catch (e) {
+    console.error("Language load error:", e);
+    applyLanguage('vi');
   }
 
   // Initial load
