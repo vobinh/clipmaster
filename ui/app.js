@@ -415,6 +415,14 @@ function formatRelativeTime(timestamp) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function formatDate(timestamp) {
+  if (!timestamp) return "";
+  const ms = timestamp > 1e11 ? timestamp : timestamp * 1000;
+  const d = new Date(ms);
+  const pad = n => n.toString().padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
 let toastTimer = null;
 function showToast(message, type = 'success') {
   if (!DOM.toast) return;
@@ -460,12 +468,13 @@ function showConfirmDialog({
   if (btnOk) btnOk.textContent = confirmText;
   if (btnCancel) btnCancel.textContent = cancelText;
 
+  // Confirm button is always synchronized as primary
+  if (btnOk) btnOk.className = 'btn-primary';
+
   if (isDanger) {
-    if (btnOk) btnOk.className = 'btn-danger';
     if (iconWrapper) iconWrapper.className = 'confirm-icon-wrapper';
     if (icon) icon.className = 'ri-error-warning-fill';
   } else {
-    if (btnOk) btnOk.className = 'btn-primary';
     if (iconWrapper) iconWrapper.className = 'confirm-icon-wrapper info';
     if (icon) icon.className = 'ri-information-fill';
   }
