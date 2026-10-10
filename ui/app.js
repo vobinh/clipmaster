@@ -380,6 +380,12 @@ const DOM = {
   // FAB
   btnFabCreateNote: document.getElementById('btn-fab-create-note'),
 
+  // Scroll Navigation
+  contentArea: document.querySelector('.content-area'),
+  scrollNavGroup: document.getElementById('scroll-nav-group'),
+  btnScrollTop: document.getElementById('btn-scroll-top'),
+  btnScrollBottom: document.getElementById('btn-scroll-bottom'),
+
   // Modals
   modalNote: document.getElementById('modal-note'),
   modalNoteTitle: document.getElementById('modal-note-title'),
@@ -632,6 +638,7 @@ function renderHistoryCards(items) {
     DOM.emptyDesc.textContent = state.searchQuery 
       ? t('empty_history_search') 
       : t('empty_history_desc');
+    updateScrollNavVisibility();
     return;
   }
 
@@ -733,6 +740,7 @@ function renderHistoryCards(items) {
 
     DOM.itemsList.appendChild(card);
   });
+  updateScrollNavVisibility();
 }
 
 function renderNoteCards(notes) {
@@ -745,6 +753,7 @@ function renderNoteCards(notes) {
     DOM.emptyDesc.textContent = state.searchQuery 
       ? t('empty_notes_search') 
       : t('empty_notes_desc');
+    updateScrollNavVisibility();
     return;
   }
 
@@ -814,6 +823,7 @@ function renderNoteCards(notes) {
 
     DOM.itemsList.appendChild(card);
   });
+  updateScrollNavVisibility();
 }
 
 function selectCard(index) {
@@ -943,6 +953,7 @@ function setupModeSwitcher() {
     DOM.searchInput.placeholder = t('search_placeholder');
     hidePinLockScreen();
     loadClips();
+    updateScrollNavVisibility();
   });
 
   DOM.tabNotes.addEventListener('click', () => {
@@ -956,6 +967,7 @@ function setupModeSwitcher() {
     DOM.appSubtitle.textContent = t('app_subtitle_notes');
     DOM.searchInput.placeholder = t('search_notes_placeholder');
     loadNotes();
+    updateScrollNavVisibility();
   });
 }
 
@@ -965,6 +977,7 @@ function showPinLockScreen() {
   DOM.itemsList.classList.add('hidden');
   DOM.emptyState.classList.add('hidden');
   DOM.btnFabCreateNote.classList.add('hidden');
+  DOM.scrollNavGroup?.classList.add('hidden');
   state.pinBuffer = '';
   updatePinDots();
   DOM.pinErrorMsg.classList.add('hidden');
@@ -976,6 +989,7 @@ function hidePinLockScreen() {
   if (state.mode === 'notes') {
     DOM.btnFabCreateNote.classList.remove('hidden');
   }
+  updateScrollNavVisibility();
 }
 
 function updatePinDots() {
@@ -2176,6 +2190,68 @@ function setupClipboardListener() {
   }
 }
 
+// ── Floating Scroll Navigation ─────────────────────────────────────
+function updateScrollNavVisibility() {
+  if (!DOM.scrollNavGroup || !DOM.contentArea) return;
+
+  const isPinLocked = DOM.pinLockScreen && !DOM.pinLockScreen.classList.contains('hidden');
+  const isEmpty = DOM.emptyState && !DOM.emptyState.classList.contains('hidden');
+
+  if (isPinLocked || isEmpty) {
+    DOM.scrollNavGroup.classList.add('hidden');
+    return;
+  }
+
+  const { scrollTop, scrollHeight, clientHeight } = DOM.contentArea;
+  const isScrollable = scrollHeight > clientHeight + 40;
+
+  if (!isScrollable) {
+    DOM.scrollNavGroup.classList.add('hidden');
+    return;
+  }
+
+  DOM.scrollNavGroup.classList.remove('hidden');
+
+  // Adjust placement above Notes FAB if present
+  const isNotesFabVisible = DOM.btnFabCreateNote && !DOM.btnFabCreateNote.classList.contains('hidden');
+  DOM.scrollNavGroup.classList.toggle('above-fab', isNotesFabVisible);
+
+  // Dim buttons when at top or bottom limits
+  const isAtTop = scrollTop <= 15;
+  const isAtBottom = scrollTop + clientHeight >= scrollHeight - 15;
+
+  if (DOM.btnScrollTop) {
+    DOM.btnScrollTop.disabled = isAtTop;
+    DOM.btnScrollTop.classList.toggle('disabled', isAtTop);
+  }
+  if (DOM.btnScrollBottom) {
+    DOM.btnScrollBottom.disabled = isAtBottom;
+    DOM.btnScrollBottom.classList.toggle('disabled', isAtBottom);
+  }
+}
+
+function setupScrollNav() {
+  if (!DOM.scrollNavGroup || !DOM.contentArea) return;
+
+  DOM.btnScrollTop?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    DOM.contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  DOM.btnScrollBottom?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    DOM.contentArea.scrollTo({ top: DOM.contentArea.scrollHeight, behavior: 'smooth' });
+  });
+
+  DOM.contentArea.addEventListener('scroll', () => {
+    updateScrollNavVisibility();
+  });
+
+  window.addEventListener('resize', () => {
+    updateScrollNavVisibility();
+  });
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return str
@@ -2210,6 +2286,7 @@ async function init() {
   setupKeyboardNavigation();
   setupHeaderActions();
   setupClipboardListener();
+  setupScrollNav();
 
   // Load saved theme
   try {

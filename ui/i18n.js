@@ -52,9 +52,14 @@ const I18N = {
     pin_title: "Ghi chú được bảo vệ bằng mã PIN",
     pin_subtitle: "Vui lòng nhập mã PIN 4 chữ số để mở khóa",
     pin_key_clear: "Xóa hết",
+    pin_key_backspace: "Xóa lùi",
     pin_btn_back: "Quay lại Lịch sử",
     pin_err_incorrect: "Sai mã PIN. Còn lại {attempts} lần thử.",
     pin_err_lockout: "Khóa tạm thời: Vui lòng đợi {seconds}s",
+
+    // Scroll Navigation
+    tooltip_scroll_top: "Lên đầu trang",
+    tooltip_scroll_bottom: "Xuống cuối trang",
 
     // Note Modal
     tooltip_fab_note: "Tạo ghi chú mới (Ctrl+N)",
@@ -328,10 +333,15 @@ const I18N = {
     // PIN Lock Screen
     pin_title: "Notes protected by PIN code",
     pin_subtitle: "Please enter your 4-digit PIN to unlock",
-    pin_key_clear: "Clear",
+    pin_key_clear: "Clear all",
+    pin_key_backspace: "Backspace",
     pin_btn_back: "Back to History",
     pin_err_incorrect: "Incorrect PIN. {attempts} attempts remaining.",
     pin_err_lockout: "Temporarily locked: Please wait {seconds}s",
+
+    // Scroll Navigation
+    tooltip_scroll_top: "Scroll to top",
+    tooltip_scroll_bottom: "Scroll to bottom",
 
     // Note Modal
     tooltip_fab_note: "Create new note (Ctrl+N)",

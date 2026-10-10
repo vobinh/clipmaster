@@ -152,12 +152,12 @@
             <button class="key-btn" data-key="7">7</button>
             <button class="key-btn" data-key="8">8</button>
             <button class="key-btn" data-key="9">9</button>
-            <button class="key-btn action-key" data-action="clear" title="Xóa hết">
+            <button class="key-btn action-key" data-action="clear" data-i18n-title="pin_key_clear" title="Xóa hết">
               <i class="ri-delete-bin-line"></i>
             </button>
             <button class="key-btn" data-key="0">0</button>
-            <button class="key-btn action-key" data-action="backspace" title="Xóa lùi">
-              <i class="ri-backspace-line"></i>
+            <button class="key-btn action-key" data-action="backspace" data-i18n-title="pin_key_backspace" title="Xóa lùi">
+              <i class="ri-delete-back-line"></i>
             </button>
           </div>
 
@@ -168,6 +168,16 @@
         </div>
       </div>
     </main>
+
+    <!-- Floating Scroll Navigation Buttons (Scroll to Top & Bottom) -->
+    <div class="scroll-nav-group hidden" id="scroll-nav-group">
+      <button class="scroll-nav-btn" id="btn-scroll-top" data-i18n-title="tooltip_scroll_top" title="Lên đầu trang">
+        <i class="ri-arrow-up-line"></i>
+      </button>
+      <button class="scroll-nav-btn" id="btn-scroll-bottom" data-i18n-title="tooltip_scroll_bottom" title="Xuống cuối trang">
+        <i class="ri-arrow-down-line"></i>
+      </button>
+    </div>
 
     <!-- Floating Action Button (FAB) for Notes -->
     <button class="fab-btn hidden" id="btn-fab-create-note" data-i18n-title="tooltip_fab_note" title="Tạo ghi chú mới (Ctrl+N)">
