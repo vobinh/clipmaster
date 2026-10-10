@@ -1,7 +1,7 @@
 use crate::clipboard::ClipboardManager;
 use crate::database::{ClipItem, Database, NoteItem, Stats};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct AppState {
     pub db: Arc<Database>,
@@ -338,8 +338,10 @@ pub fn close_window(app_handle: AppHandle) {
 // ── Clipboard Pause / Resume Controls ──────────────────
 
 #[tauri::command]
-pub fn toggle_clipboard_pause(state: State<AppState>) -> Result<bool, String> {
+pub fn toggle_clipboard_pause(app_handle: AppHandle, state: State<AppState>) -> Result<bool, String> {
     let paused = state.clipboard.toggle_pause();
+    crate::update_tray_menu(&app_handle);
+    app_handle.emit("clipboard_pause_changed", paused).ok();
     Ok(paused)
 }
 

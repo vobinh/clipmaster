@@ -12,7 +12,7 @@ use clipboard::ClipboardManager;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager,
+    Emitter, Manager,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -93,14 +93,18 @@ pub fn run() {
                 }
             }
 
-            // Setup Tray Menu with saved language
+            // Setup Tray Menu with saved language & pause status
             let lang = db_for_setup.get_setting("language", "vi");
-            let (toggle_label, quit_label, tooltip) = get_tray_labels(&lang);
+            let is_paused = clipboard_for_setup.is_paused();
+            let (toggle_label, pause_label, quit_label, tooltip) = get_tray_labels(&lang, is_paused);
 
             let toggle_item = MenuItemBuilder::with_id("toggle", toggle_label).build(app)?;
+            let pause_item = MenuItemBuilder::with_id("pause_toggle", pause_label).build(app)?;
             let quit_item = MenuItemBuilder::with_id("quit", quit_label).build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&toggle_item)
+                .separator()
+                .item(&pause_item)
                 .separator()
                 .item(&quit_item)
                 .build()?;
@@ -125,6 +129,12 @@ pub fn run() {
                                 window.set_focus().ok();
                             }
                         }
+                    }
+                    "pause_toggle" => {
+                        let state = app.state::<AppState>();
+                        let paused = state.clipboard.toggle_pause();
+                        update_tray_menu(app);
+                        app.emit("clipboard_pause_changed", paused).ok();
                     }
                     "quit" => {
                         app.exit(0);
@@ -157,29 +167,46 @@ pub fn run() {
         .expect("error while running clipmaster application");
 }
 
-pub fn get_tray_labels(lang: &str) -> (&'static str, &'static str, &'static str) {
+pub fn get_tray_labels(lang: &str, is_paused: bool) -> (&'static str, &'static str, &'static str, &'static str) {
     if lang == "en" {
-        ("Toggle ClipMaster", "Quit", "ClipMaster - Clipboard Manager")
+        let pause_label = if is_paused { "▶ Resume Monitoring" } else { "⏸ Pause Monitoring" };
+        let tooltip = if is_paused { "ClipMaster - Monitoring Paused" } else { "ClipMaster - Clipboard Manager" };
+        ("Toggle ClipMaster", pause_label, "Quit", tooltip)
     } else {
-        ("Hiện / Ẩn ClipMaster", "Thoát", "ClipMaster - Quản lý Clipboard")
+        let pause_label = if is_paused { "▶ Tiếp tục theo dõi (Resume)" } else { "⏸ Tạm dừng theo dõi (Pause)" };
+        let tooltip = if is_paused { "ClipMaster - Đã tạm dừng theo dõi" } else { "ClipMaster - Quản lý Clipboard" };
+        ("Hiện / Ẩn ClipMaster", pause_label, "Thoát", tooltip)
     }
 }
 
-pub fn update_tray_language(app: &tauri::AppHandle, lang: &str) {
+pub fn update_tray_menu(app: &tauri::AppHandle) {
     if let Some(tray) = app.tray_by_id("main-tray") {
-        let (toggle_label, quit_label, tooltip) = get_tray_labels(lang);
+        let state = app.state::<AppState>();
+        let lang = state.db.get_setting("language", "vi");
+        let is_paused = state.clipboard.is_paused();
+
+        let (toggle_label, pause_label, quit_label, tooltip) = get_tray_labels(&lang, is_paused);
         tray.set_tooltip(Some(tooltip)).ok();
+
         if let Ok(toggle_item) = MenuItemBuilder::with_id("toggle", toggle_label).build(app) {
-            if let Ok(quit_item) = MenuItemBuilder::with_id("quit", quit_label).build(app) {
-                if let Ok(menu) = MenuBuilder::new(app)
-                    .item(&toggle_item)
-                    .separator()
-                    .item(&quit_item)
-                    .build()
-                {
-                    tray.set_menu(Some(menu)).ok();
+            if let Ok(pause_item) = MenuItemBuilder::with_id("pause_toggle", pause_label).build(app) {
+                if let Ok(quit_item) = MenuItemBuilder::with_id("quit", quit_label).build(app) {
+                    if let Ok(menu) = MenuBuilder::new(app)
+                        .item(&toggle_item)
+                        .separator()
+                        .item(&pause_item)
+                        .separator()
+                        .item(&quit_item)
+                        .build()
+                    {
+                        tray.set_menu(Some(menu)).ok();
+                    }
                 }
             }
         }
     }
+}
+
+pub fn update_tray_language(app: &tauri::AppHandle, _lang: &str) {
+    update_tray_menu(app);
 }

@@ -2180,8 +2180,12 @@ function setupPauseButton() {
     DOM.btnPause.addEventListener('click', async () => {
       try {
         const isPaused = await invoke('toggle_clipboard_pause');
-        updatePauseUI(isPaused);
-        showToast(isPaused ? t('toast_clipboard_paused') : t('toast_clipboard_resumed'));
+        const tauri = getTauri();
+        // If not running in Tauri or event system isn't listening, update UI directly
+        if (!tauri || !tauri.event || typeof tauri.event.listen !== 'function') {
+          updatePauseUI(isPaused);
+          showToast(isPaused ? t('toast_clipboard_paused') : t('toast_clipboard_resumed'));
+        }
       } catch (e) {
         console.error("Toggle pause error:", e);
       }
@@ -2239,6 +2243,13 @@ function setupClipboardListener() {
       if (state.mode === 'history') {
         loadClips();
       }
+    });
+
+    tauri.event.listen('clipboard_pause_changed', (event) => {
+      console.log("[Clipboard Event] Pause state changed:", event.payload);
+      const isPaused = !!event.payload;
+      updatePauseUI(isPaused);
+      showToast(isPaused ? t('toast_clipboard_paused') : t('toast_clipboard_resumed'));
     });
   }
 }
