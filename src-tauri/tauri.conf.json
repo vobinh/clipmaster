@@ -32,6 +32,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "shortDescription": "ClipMaster - Modern Clipboard Manager",
+    "longDescription": "ClipMaster - Cross-platform Modern Clipboard Manager built with Rust & Tauri v2",
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
