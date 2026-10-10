@@ -257,7 +257,7 @@ const I18N = {
     // Settings About
     about_version: "Phiên bản 2.0.0 (Native Rust Edition)",
     about_desc: "Trình quản lý bộ nhớ tạm đa nền tảng tối ưu hiệu năng cao bằng Rust và Tauri v2. Hỗ trợ Linux, Windows và macOS.",
-    about_copyright: "Giữ bản quyền © 2026 ClipMaster Open Source.",
+    about_copyright: "Giữ bản quyền © 2026 vobinh9x.",
     btn_save_settings: "Đóng & Lưu",
 
     // Card Actions
@@ -551,7 +551,7 @@ const I18N = {
     // Settings About
     about_version: "Version 2.0.0 (Native Rust Edition)",
     about_desc: "High-performance cross-platform clipboard manager built with Rust and Tauri v2. Runs on Linux, Windows, and macOS.",
-    about_copyright: "Copyright © 2026 ClipMaster Open Source.",
+    about_copyright: "Copyright © 2026 vobinh9x.",
     btn_save_settings: "Close & Save",
 
     // Card Actions

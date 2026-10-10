@@ -2,6 +2,7 @@
   "name": "clipmaster",
   "version": "2.0.0",
   "description": "ClipMaster - Cross-platform Modern Clipboard Manager in Rust & Tauri v2",
+  "author": "vobinh9x",
   "private": true,
   "scripts": {
     "dev": "node scripts/tauri.js dev",

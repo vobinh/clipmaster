@@ -1,10 +1,10 @@
 [package]
-name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+name = "clipmaster"
+version = "2.0.0"
+description = "ClipMaster - Cross-platform Modern Clipboard Manager in Rust & Tauri v2"
+authors = ["vobinh9x"]
+license = "MIT"
+repository = "https://github.com/vobinh/clipmaster"
 edition = "2024"
 rust-version = "1.90"
 

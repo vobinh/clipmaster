@@ -32,6 +32,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "vobinh9x",
+    "copyright": "Copyright © 2026 vobinh9x",
     "shortDescription": "ClipMaster - Modern Clipboard Manager",
     "longDescription": "ClipMaster - Cross-platform Modern Clipboard Manager built with Rust & Tauri v2",
     "icon": [
