@@ -382,6 +382,7 @@ const DOM = {
   emptyTitle: document.getElementById('empty-title'),
   emptyDesc: document.getElementById('empty-desc'),
   footerStatus: document.getElementById('footer-status'),
+  footerHint: document.getElementById('footer-hint'),
   appSubtitle: document.getElementById('app-subtitle'),
   
   // Search

@@ -45,6 +45,9 @@ const I18N = {
 
     // Footer
     footer_hint: "↑↓ Chọn • Enter Dán • Del Xóa",
+    hint_select: "Chọn",
+    hint_paste: "Dán",
+    hint_delete: "Xóa",
     footer_clips_status: "Tổng cộng: {total} mục ({pinned} đã ghim)",
     footer_notes_status: "Ghi chú: {total} mục ({pinned} đã ghim)",
 
@@ -336,6 +339,9 @@ const I18N = {
 
     // Footer
     footer_hint: "↑↓ Select • Enter Paste • Del Delete",
+    hint_select: "Select",
+    hint_paste: "Paste",
+    hint_delete: "Delete",
     footer_clips_status: "Total: {total} items ({pinned} pinned)",
     footer_notes_status: "Notes: {total} items ({pinned} pinned)",
 
