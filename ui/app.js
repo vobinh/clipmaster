@@ -156,7 +156,7 @@ async function mockInvoke(cmd, args) {
     case 'get_all_settings':
       return { ...mockStore.settings };
     case 'reset_settings':
-      mockStore.settings = { max_history: "200", auto_paste: "1", theme_mode: "dark", notes_pin_enabled: "0", language: "vi" };
+      mockStore.settings = { max_history: "200", auto_paste: "1", theme_mode: "dark", accent_color: "indigo", notes_pin_enabled: "0", language: "vi" };
       return;
     case 'set_autostart':
       mockStore.settings.autostart = args.enabled ? "1" : "0";
@@ -312,13 +312,41 @@ function applyLanguage(lang) {
   }
 }
 
-// ── Theme Management ────────────────────────────────────────────────
+// ── Theme & Accent Management ───────────────────────────────────────
 function updateThemeUI(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const icon = document.getElementById('icon-theme');
   if (icon) {
     icon.className = theme === 'dark' ? 'ri-moon-line' : 'ri-sun-line';
   }
+}
+
+function updateAccentColorUI(colorId) {
+  const validColors = ['indigo', 'emerald', 'ocean', 'rose', 'amber', 'violet'];
+  const color = validColors.includes(colorId) ? colorId : 'indigo';
+  state.accentColor = color;
+  document.documentElement.setAttribute('data-accent', color);
+
+  const dots = document.querySelectorAll('.theme-color-dot');
+  dots.forEach(dot => {
+    dot.classList.toggle('active', dot.dataset.color === color);
+  });
+}
+
+function setupAccentColorPicker() {
+  const palette = document.getElementById('theme-color-palette');
+  if (!palette) return;
+
+  palette.addEventListener('click', async (e) => {
+    const dot = e.target.closest('.theme-color-dot');
+    if (!dot) return;
+
+    const color = dot.dataset.color;
+    if (color) {
+      updateAccentColorUI(color);
+      await invoke('set_setting', { key: 'accent_color', value: color });
+    }
+  });
 }
 
 // ── Application State ──────────────────────────────────────────────
@@ -335,6 +363,7 @@ const state = {
   lockoutTimer: null,
   lockoutRemaining: 0,
   activeNoteColor: '',
+  accentColor: 'indigo',
   isPaused: false
 };
 
@@ -1172,6 +1201,7 @@ async function openSettingsModal() {
   const themeMode = settings.theme_mode || 'dark';
   const language = settings.language || currentLang || 'vi';
   const autostart = settings.autostart === '1';
+  const accentColor = settings.accent_color || 'indigo';
 
   const elTheme = document.getElementById('setting-theme-mode');
   const elLang = document.getElementById('setting-language');
@@ -1179,6 +1209,7 @@ async function openSettingsModal() {
   if (elTheme) elTheme.value = themeMode;
   if (elLang) elLang.value = language;
   if (elAutostart) elAutostart.checked = autostart;
+  updateAccentColorUI(accentColor);
 
   // Storage tab
   const autoRecord = settings.auto_record !== '0';
@@ -1665,6 +1696,9 @@ function setupSettingsModal() {
     if (elTheme) {
       updateThemeUI(elTheme.value);
       await invoke('set_setting', { key: 'theme_mode', value: elTheme.value });
+    }
+    if (state.accentColor) {
+      await invoke('set_setting', { key: 'accent_color', value: state.accentColor });
     }
     if (elLang) {
       const langVal = elLang.value;
@@ -2287,6 +2321,7 @@ async function init() {
   setupHeaderActions();
   setupClipboardListener();
   setupScrollNav();
+  setupAccentColorPicker();
 
   // Load saved theme
   try {
@@ -2295,6 +2330,15 @@ async function init() {
   } catch (e) {
     console.error("Theme load error:", e);
     updateThemeUI('dark');
+  }
+
+  // Load saved accent color
+  try {
+    const savedAccent = await invoke('get_setting', { key: 'accent_color', default_val: 'indigo' });
+    updateAccentColorUI(savedAccent || 'indigo');
+  } catch (e) {
+    console.error("Accent color load error:", e);
+    updateAccentColorUI('indigo');
   }
 
   // Load saved language
