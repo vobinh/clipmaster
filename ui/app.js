@@ -168,6 +168,9 @@ async function mockInvoke(cmd, args) {
       return mockStore.is_paused;
     case 'is_clipboard_paused':
       return !!mockStore.is_paused;
+    case 'open_url':
+      window.open(args.url, '_blank');
+      return;
     case 'drag_window':
       return;
     case 'hide_window':
@@ -721,6 +724,12 @@ function renderHistoryCards(items) {
       previewHtml = `<div class="card-content">${escapeHtml(item.content || "")}</div>`;
     }
 
+    const isUrl = item.type === 'url' || isLikelyUrl(item.content);
+    const openLinkBtnHtml = isUrl ? `
+      <button class="card-btn" data-action="open-link" title="${t('tooltip_open_link')}">
+        <i class="ri-external-link-line"></i>
+      </button>` : '';
+
     card.innerHTML = `
       <div class="card-header">
         <span class="card-badge"><i class="${typeIcon}"></i> ${typeBadgeLabel}</span>
@@ -734,6 +743,7 @@ function renderHistoryCards(items) {
         <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">
           <i class="ri-delete-bin-line"></i>
         </button>
+        ${openLinkBtnHtml}
       </div>
     `;
 
@@ -766,6 +776,15 @@ function renderHistoryCards(items) {
       e.stopPropagation();
       await deleteClip(item.id);
     });
+
+    // Open Link button
+    const btnOpenLink = card.querySelector('[data-action="open-link"]');
+    if (btnOpenLink) {
+      btnOpenLink.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await openLink(item.content);
+      });
+    }
 
     DOM.itemsList.appendChild(card);
   });
@@ -2284,6 +2303,26 @@ function setupScrollNav() {
   window.addEventListener('resize', () => {
     updateScrollNavVisibility();
   });
+}
+
+function isLikelyUrl(str) {
+  if (!str) return false;
+  const s = str.trim();
+  return /^https?:\/\//i.test(s) || /^ftp:\/\//i.test(s) || /^www\.[a-z0-9-]+\.[a-z]{2,}/i.test(s);
+}
+
+async function openLink(rawUrl) {
+  if (!rawUrl) return;
+  let url = rawUrl.trim();
+  if (!/^https?:\/\//i.test(url) && !/^ftp:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+    url = 'https://' + url;
+  }
+  try {
+    await invoke('open_url', { url });
+  } catch (err) {
+    console.warn("invoke open_url error, fallback to window.open:", err);
+    window.open(url, '_blank');
+  }
 }
 
 function escapeHtml(str) {

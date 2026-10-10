@@ -728,6 +728,11 @@ body {
   color: var(--danger);
 }
 
+.card-btn[data-action="open-link"]:hover {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
 /* Floating Action Button (FAB) */
 .fab-btn {
   position: absolute;

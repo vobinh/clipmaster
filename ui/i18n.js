@@ -262,6 +262,7 @@ const I18N = {
     tooltip_unpin: "Bỏ ghim",
     tooltip_delete: "Xóa",
     tooltip_edit: "Chỉnh sửa",
+    tooltip_open_link: "Mở liên kết trong trình duyệt",
 
     // Alerts & Toasts
     alert_pin_length: "Mã PIN phải gồm đúng 4 chữ số (0-9)!",
@@ -552,6 +553,7 @@ const I18N = {
     tooltip_unpin: "Unpin",
     tooltip_delete: "Delete",
     tooltip_edit: "Edit",
+    tooltip_open_link: "Open link in browser",
 
     // Alerts & Toasts
     alert_pin_length: "PIN code must be exactly 4 digits (0-9)!",
