@@ -1,7 +1,9 @@
-mod clipboard;
-mod commands;
-mod database;
-mod sync;
+pub mod clipboard;
+pub mod commands;
+pub mod database;
+pub mod ipc;
+pub mod shortcut;
+pub mod sync;
 
 use std::sync::Arc;
 use commands::*;
@@ -74,6 +76,15 @@ pub fn run() {
                 Arc::clone(&db_for_setup),
                 app.handle().clone(),
             );
+
+            // Start background IPC Server for --toggle CLI shortcut
+            ipc::start_ipc_server(app.handle().clone());
+
+            // Ensure GNOME global shortcut is registered on Linux
+            #[cfg(target_os = "linux")]
+            {
+                shortcut::ensure_shortcut_registered(&db_for_setup);
+            }
 
             // Setup Tray Menu
             let toggle_item = MenuItemBuilder::with_id("toggle", "Hiện / Ẩn ClipMaster").build(app)?;

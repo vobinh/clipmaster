@@ -239,7 +239,14 @@ pub fn get_setting(state: State<AppState>, key: String, default_val: Option<Stri
 
 #[tauri::command]
 pub fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
-    state.db.set_setting(&key, &value).map_err(|e| e.to_string())
+    state.db.set_setting(&key, &value).map_err(|e| e.to_string())?;
+    if key == "shortcut" {
+        #[cfg(target_os = "linux")]
+        {
+            crate::shortcut::install_gnome_shortcut(&value);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
