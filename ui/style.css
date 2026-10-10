@@ -728,9 +728,18 @@ body {
   color: var(--danger);
 }
 
-.card-btn[data-action="open-link"]:hover {
+.card-btn[data-action="open-link"] {
+  margin-right: auto;
+  color: var(--accent-text);
   background: var(--accent-subtle);
-  color: var(--accent);
+  border: 1px solid var(--border-subtle);
+}
+
+.card-btn[data-action="open-link"]:hover {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  transform: translateY(-1px);
 }
 
 /* Floating Action Button (FAB) */

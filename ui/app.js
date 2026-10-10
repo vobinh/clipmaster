@@ -737,13 +737,13 @@ function renderHistoryCards(items) {
       </div>
       ${previewHtml}
       <div class="card-actions">
+        ${openLinkBtnHtml}
         <button class="card-btn ${item.is_pinned ? 'pinned' : ''}" data-action="pin" title="${item.is_pinned ? t('tooltip_unpin') : t('tooltip_pin')}">
           <i class="${item.is_pinned ? 'ri-pushpin-fill' : 'ri-pushpin-line'}"></i>
         </button>
         <button class="card-btn" data-action="delete" title="${t('tooltip_delete')}">
           <i class="ri-delete-bin-line"></i>
         </button>
-        ${openLinkBtnHtml}
       </div>
     `;
 
