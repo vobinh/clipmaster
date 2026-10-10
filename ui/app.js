@@ -303,6 +303,13 @@ function applyLanguage(lang) {
     if (state.currentItems.length > 0) renderNoteCards(state.currentItems);
     updateFooterStatusNotes();
   }
+
+  // 10. Update Sync Status text if configured
+  const syncStatusText = document.getElementById('sync-status-text');
+  const settingUrl = document.getElementById('setting-sync-url');
+  if (syncStatusText && settingUrl && settingUrl.value.trim()) {
+    syncStatusText.innerHTML = '<i class="ri-checkbox-circle-fill" style="color: #10b981; margin-right: 4px;"></i> <span>' + escapeHtml(t('sync_connected_status', 'Đã kết nối Supabase BYOS:') + ' ' + settingUrl.value.trim()) + '</span>';
+  }
 }
 
 // ── Theme Management ────────────────────────────────────────────────
@@ -421,6 +428,37 @@ function formatDate(timestamp) {
   const d = new Date(ms);
   const pad = n => n.toString().padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+function localizeSyncMessage(msg) {
+  if (!msg) return "";
+  const s = String(msg).trim();
+  if (s.includes("Kết nối Supabase BYOS thành công") || s.includes("Sẵn sàng đồng bộ") || s.toLowerCase().includes("ready to sync") || s.toLowerCase().includes("connected to supabase")) {
+    return t('sync_test_success', 'Kết nối Supabase BYOS thành công! (Sẵn sàng đồng bộ)');
+  }
+  if (s.includes("Đồng bộ hoàn tất") || s.includes("mới nhất") || s.toLowerCase().includes("up to date")) {
+    return t('sync_up_to_date', 'Đồng bộ hoàn tất: Dữ liệu đã đồng bộ mới nhất.');
+  }
+  if (s.includes("Đồng bộ thành công") || s.toLowerCase().includes("sync successful")) {
+    const match = s.match(/\((.*?)\)/);
+    if (match) {
+      return `${t('toast_sync_success', 'Đồng bộ đám mây thành công!')} (${match[1]})`;
+    }
+    return t('toast_sync_success', 'Đồng bộ đám mây thành công!');
+  }
+  if (s.includes("Vui lòng cấu hình") || s.includes("Chưa cấu hình") || s.toLowerCase().includes("configure")) {
+    return t('sync_missing_config', 'Vui lòng cấu hình URL và API Key trước khi đồng bộ.');
+  }
+  if (s.includes("đang bị tắt trong Cài đặt") || s.toLowerCase().includes("disabled in settings")) {
+    return t('sync_disabled_error', 'Tính năng đồng bộ đám mây đang bị tắt trong Cài đặt.');
+  }
+  if (s.includes("TABLE_NOT_FOUND")) {
+    return t('wizard_need_db', 'Kết nối thành công! Cần khởi tạo database...');
+  }
+  if (s.includes("RLS_BLOCKED")) {
+    return t('wizard_rls_blocked', 'Bảng bị chặn ghi bởi Row Level Security (RLS). Cần cập nhật schema...');
+  }
+  return s.replace(/^Error:\s*/i, '');
 }
 
 let toastTimer = null;
@@ -1097,7 +1135,7 @@ function setupNoteModal() {
       loadNotes();
     } catch (err) {
       console.error("Save note failed:", err);
-      showToast(err?.toString() || "Lỗi lưu ghi chú", 'error');
+      showToast(err?.toString() || t('err_save_note', "Lỗi lưu ghi chú"), 'error');
     }
   });
 }
@@ -1508,14 +1546,16 @@ function setupSettingsModal() {
   if (btnTestSync) {
     btnTestSync.addEventListener('click', async () => {
       const statusText = document.getElementById('sync-status-text');
-      if (statusText) statusText.textContent = "Đang kiểm tra kết nối máy chủ Supabase...";
+      if (statusText) statusText.textContent = t('sync_status_testing', 'Đang kiểm tra kết nối máy chủ Supabase...');
 
       try {
-        const msg = await invoke('test_sync_connection');
-        showToast(msg);
+        const rawMsg = await invoke('test_sync_connection');
+        const msg = localizeSyncMessage(rawMsg);
+        showToast(msg, 'success');
         if (statusText) statusText.textContent = msg;
       } catch (err) {
-        const errMsg = err?.toString() || "Lỗi kiểm tra kết nối";
+        const rawErr = err?.toString() || '';
+        const errMsg = localizeSyncMessage(rawErr) || t('sync_test_failed', 'Lỗi kiểm tra kết nối');
         showToast(errMsg, 'error');
         if (statusText) statusText.textContent = errMsg;
       }
@@ -1534,18 +1574,20 @@ function setupSettingsModal() {
       await invoke('set_setting', { key: 'sync_direction', value: syncDirection });
 
       const statusText = document.getElementById('sync-status-text');
-      if (statusText) statusText.textContent = "Đang tiến hành đồng bộ dữ liệu đám mây...";
+      if (statusText) statusText.textContent = t('sync_status_syncing', 'Đang tiến hành đồng bộ dữ liệu đám mây...');
 
       try {
-        const msg = await invoke('sync_now');
-        showToast(msg);
+        const rawMsg = await invoke('sync_now');
+        const msg = localizeSyncMessage(rawMsg);
+        showToast(msg, 'success');
         if (statusText) statusText.textContent = msg;
         const lastValEl = document.getElementById('sync-info-last-val');
         if (lastValEl) lastValEl.textContent = t('time_just_now', 'Vừa xong');
         await loadClips();
         if (state.mode === 'notes') await loadNotes();
       } catch (err) {
-        const errMsg = err?.toString() || "Lỗi đồng bộ";
+        const rawErr = err?.toString() || '';
+        const errMsg = localizeSyncMessage(rawErr) || t('toast_sync_failed', 'Lỗi đồng bộ đám mây!');
         showToast(errMsg, 'error');
         if (statusText) statusText.textContent = errMsg;
       }
@@ -1860,7 +1902,7 @@ function setupSyncWizard() {
     if (settingUrl) settingUrl.value = url;
     if (settingToken) settingToken.value = key;
     if (syncStatusText) {
-      syncStatusText.innerHTML = '<i class="ri-checkbox-circle-fill" style="color: #10b981; margin-right: 4px;"></i> <span>' + escapeHtml("Đã kết nối Supabase BYOS: " + url) + '</span>';
+      syncStatusText.innerHTML = '<i class="ri-checkbox-circle-fill" style="color: #10b981; margin-right: 4px;"></i> <span>' + escapeHtml(t('sync_connected_status', 'Đã kết nối Supabase BYOS:') + " " + url) + '</span>';
     }
 
     // Switch to configured view

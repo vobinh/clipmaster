@@ -132,7 +132,7 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
     let api_key = key.trim();
 
     if base_url.is_empty() || api_key.is_empty() {
-        return Err("Vui lòng nhập đầy đủ Supabase URL và API Key".to_string());
+        return Err("Please enter both Supabase URL and API Key".to_string());
     }
 
     let client = make_client();
@@ -146,18 +146,18 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         .header("Accept", "application/json")
         .send()
         .await
-        .map_err(|e| format!("Không thể kết nối đến máy chủ: {}", e))?;
+        .map_err(|e| format!("Could not connect to Supabase: {}", e))?;
 
     let status = resp.status();
     if status.as_u16() == 404 {
-        return Err("TABLE_NOT_FOUND: Chưa tạo bảng trên Supabase! Bảng 'pinned_clips' không tồn tại.".to_string());
+        return Err("TABLE_NOT_FOUND: 'pinned_clips' table does not exist on Supabase.".to_string());
     }
     if status.as_u16() == 401 || status.as_u16() == 403 {
-        return Err("API Key (anon public key) không hợp lệ hoặc bị từ chối!".to_string());
+        return Err("API Key (anon public key) is invalid or rejected!".to_string());
     }
     if !status.is_success() {
         let err_body = resp.text().await.unwrap_or_default();
-        return Err(format!("Lỗi kiểm tra bảng: {} ({})", status, err_body));
+        return Err(format!("Table check failed: {} ({})", status, err_body));
     }
 
     // 2. Check user_notes table
@@ -169,10 +169,10 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         .header("Accept", "application/json")
         .send()
         .await
-        .map_err(|e| format!("Không thể kết nối đến user_notes: {}", e))?;
+        .map_err(|e| format!("Could not connect to user_notes: {}", e))?;
 
     if resp_notes.status().as_u16() == 404 {
-        return Err("TABLE_NOT_FOUND: Bảng 'user_notes' chưa được tạo trên Supabase!".to_string());
+        return Err("TABLE_NOT_FOUND: 'user_notes' table does not exist on Supabase!".to_string());
     }
 
     // 3. Probe write test
@@ -204,7 +204,7 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         if !p_res.status().is_success() {
             let p_body = p_res.text().await.unwrap_or_default();
             if p_body.to_lowercase().contains("policy") || p_body.to_lowercase().contains("row-level security") {
-                return Err("RLS_BLOCKED: Bảng có sẵn nhưng RLS (Row Level Security) đang chặn quyền ghi!".to_string());
+                return Err("RLS_BLOCKED: Row Level Security (RLS) is blocking writes on Supabase table!".to_string());
             }
         } else {
             // Clean up probe record
@@ -218,12 +218,12 @@ pub async fn test_connection(url: &str, key: &str) -> Result<String, String> {
         }
     }
 
-    Ok("Kết nối Supabase BYOS thành công! (Sẵn sàng đồng bộ)".to_string())
+    Ok("Connected to Supabase BYOS successfully! (Ready to sync)".to_string())
 }
 
 pub async fn auto_setup_schema(url: &str, pat: &str) -> Result<String, String> {
     let project_ref = extract_project_ref(url)
-        .ok_or_else(|| "Không thể nhận diện Project Ref từ Supabase URL".to_string())?;
+        .ok_or_else(|| "Could not parse Project Ref from Supabase URL".to_string())?;
 
     let api_url = format!("https://api.supabase.com/v1/projects/{}/database/query", project_ref);
     let client = make_client();
@@ -235,13 +235,13 @@ pub async fn auto_setup_schema(url: &str, pat: &str) -> Result<String, String> {
         .json(&serde_json::json!({ "query": SCHEMA_SQL }))
         .send()
         .await
-        .map_err(|e| format!("Không thể kết nối đến Supabase Management API: {}", e))?;
+        .map_err(|e| format!("Could not connect to Supabase Management API: {}", e))?;
 
     if resp.status().is_success() {
-        Ok("Đã tự động khởi tạo bảng 'pinned_clips' và 'user_notes' thành công!".to_string())
+        Ok("Successfully created 'pinned_clips' and 'user_notes' tables!".to_string())
     } else {
         let err_text = resp.text().await.unwrap_or_default();
-        Err(format!("Không thể tạo bảng qua PAT: {}", err_text))
+        Err(format!("Failed to setup tables via PAT: {}", err_text))
     }
 }
 
@@ -252,14 +252,14 @@ pub async fn sync_now(db: &Database) -> Result<String, String> {
     let direction = db.get_setting("sync_direction", "bidirectional");
 
     if !enabled {
-        return Err("Tính năng đồng bộ đám mây đang bị tắt trong Cài đặt".to_string());
+        return Err("Cloud sync is disabled in Settings".to_string());
     }
 
     let base_url = url.trim().trim_end_matches('/');
     let api_key = key.trim();
 
     if base_url.is_empty() || api_key.is_empty() {
-        return Err("Vui lòng cấu hình URL và API Key trước khi đồng bộ".to_string());
+        return Err("Please configure URL and API Key before syncing".to_string());
     }
 
     let client = make_client();
@@ -437,8 +437,8 @@ pub async fn sync_now(db: &Database) -> Result<String, String> {
     }
 
     if parts.is_empty() {
-        Ok("Đồng bộ hoàn tất: Dữ liệu đã đồng bộ mới nhất".to_string())
+        Ok("Sync complete: All data is up to date".to_string())
     } else {
-        Ok(format!("Đồng bộ thành công ({})", parts.join(", ")))
+        Ok(format!("Sync successful ({})", parts.join(", ")))
     }
 }
