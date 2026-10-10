@@ -660,7 +660,10 @@ function renderHistoryCards(items) {
           <span class="card-content font-mono">${escapeHtml(item.content)}</span>
         </div>`;
     } else if (item.type === 'code') {
-      previewHtml = `<div class="card-content code">${escapeHtml(item.content)}</div>`;
+      previewHtml = `
+        <div class="card-code-wrapper">
+          <div class="card-content code">${escapeHtml(item.content)}</div>
+        </div>`;
     } else if (item.type === 'image') {
       const dimensions = (item.image_width && item.image_height) 
         ? `${item.image_width} × ${item.image_height} px` 
