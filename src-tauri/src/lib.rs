@@ -86,19 +86,29 @@ pub fn run() {
                 shortcut::ensure_shortcut_registered(&db_for_setup);
             }
 
-            // Setup Tray Menu
-            let toggle_item = MenuItemBuilder::with_id("toggle", "Hiện / Ẩn ClipMaster").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Thoát").build(app)?;
+            // Ensure window icon is explicitly set
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(icon) = app.default_window_icon() {
+                    window.set_icon(icon.clone()).ok();
+                }
+            }
+
+            // Setup Tray Menu with saved language
+            let lang = db_for_setup.get_setting("language", "vi");
+            let (toggle_label, quit_label, tooltip) = get_tray_labels(&lang);
+
+            let toggle_item = MenuItemBuilder::with_id("toggle", toggle_label).build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", quit_label).build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&toggle_item)
                 .separator()
                 .item(&quit_item)
                 .build()?;
 
-            let mut tray_builder = TrayIconBuilder::new()
+            let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .tooltip("ClipMaster");
+                .tooltip(tooltip);
 
             if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
@@ -145,4 +155,31 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running clipmaster application");
+}
+
+pub fn get_tray_labels(lang: &str) -> (&'static str, &'static str, &'static str) {
+    if lang == "en" {
+        ("Toggle ClipMaster", "Quit", "ClipMaster - Clipboard Manager")
+    } else {
+        ("Hiện / Ẩn ClipMaster", "Thoát", "ClipMaster - Quản lý Clipboard")
+    }
+}
+
+pub fn update_tray_language(app: &tauri::AppHandle, lang: &str) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let (toggle_label, quit_label, tooltip) = get_tray_labels(lang);
+        tray.set_tooltip(Some(tooltip)).ok();
+        if let Ok(toggle_item) = MenuItemBuilder::with_id("toggle", toggle_label).build(app) {
+            if let Ok(quit_item) = MenuItemBuilder::with_id("quit", quit_label).build(app) {
+                if let Ok(menu) = MenuBuilder::new(app)
+                    .item(&toggle_item)
+                    .separator()
+                    .item(&quit_item)
+                    .build()
+                {
+                    tray.set_menu(Some(menu)).ok();
+                }
+            }
+        }
+    }
 }

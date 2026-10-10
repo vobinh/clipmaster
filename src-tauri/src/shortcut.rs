@@ -92,10 +92,11 @@ pub fn install_gnome_shortcut(shortcut_key: &str) -> bool {
 pub fn ensure_desktop_integration() {
     if let Ok(home) = std::env::var("HOME") {
         let home_path = std::path::PathBuf::from(&home);
+        let hicolor_dir = home_path.join(".local/share/icons/hicolor");
 
-        // 1. Install scalable icon
-        let icon_dir = home_path.join(".local/share/icons/hicolor/scalable/apps");
-        std::fs::create_dir_all(&icon_dir).ok();
+        // 1. Install scalable icon (.svg)
+        let svg_dir = hicolor_dir.join("scalable/apps");
+        std::fs::create_dir_all(&svg_dir).ok();
 
         let possible_svgs = [
             std::path::PathBuf::from("/usr/share/icons/hicolor/scalable/apps/clipmaster.svg"),
@@ -105,32 +106,56 @@ pub fn ensure_desktop_integration() {
 
         for src in &possible_svgs {
             if src.exists() {
-                std::fs::copy(src, icon_dir.join("clipmaster.svg")).ok();
-                std::fs::copy(src, icon_dir.join("com.clipmaster.app.svg")).ok();
+                std::fs::copy(src, svg_dir.join("clipmaster.svg")).ok();
+                std::fs::copy(src, svg_dir.join("com.clipmaster.app.svg")).ok();
+                std::fs::copy(src, svg_dir.join("app.svg")).ok();
                 break;
             }
         }
 
-        // 2. Install desktop launcher
+        // 2. Install PNG icons for fast dock/taskbar resolution (128x128, 512x512, 32x32)
+        let png_sizes = [("128x128", "128x128.png"), ("512x512", "icon.png"), ("32x32", "32x32.png")];
+        for (dir_name, file_name) in png_sizes {
+            let target_dir = hicolor_dir.join(dir_name).join("apps");
+            std::fs::create_dir_all(&target_dir).ok();
+            let possible_pngs = [
+                std::path::PathBuf::from(format!("src-tauri/icons/{}", file_name)),
+                std::path::PathBuf::from(format!("icons/{}", file_name)),
+            ];
+            for src in &possible_pngs {
+                if src.exists() {
+                    std::fs::copy(src, target_dir.join("clipmaster.png")).ok();
+                    std::fs::copy(src, target_dir.join("app.png")).ok();
+                    std::fs::copy(src, target_dir.join("com.clipmaster.app.png")).ok();
+                    break;
+                }
+            }
+        }
+
+        // 3. Install desktop launchers (clipmaster.desktop, app.desktop, com.clipmaster.app.desktop)
         let app_dir = home_path.join(".local/share/applications");
         std::fs::create_dir_all(&app_dir).ok();
         let exec_cmd = get_executable_command();
 
         let desktop_content = format!(
-            "[Desktop Entry]\nName=ClipMaster\nGenericName=Clipboard Manager\nComment=Windows + V style Clipboard History Manager for Linux\nExec={}\nIcon=clipmaster\nTerminal=false\nType=Application\nCategories=Utility;Accessories;\nStartupNotify=false\nStartupWMClass=ClipMaster\n",
+            "[Desktop Entry]\nName=ClipMaster\nGenericName=Clipboard Manager\nComment=Windows + V style Clipboard History Manager for Linux\nExec={}\nIcon=clipmaster\nTerminal=false\nType=Application\nCategories=Utility;Accessories;\nStartupNotify=false\nStartupWMClass=clipmaster\n",
             exec_cmd
         );
 
-        let desktop_file = app_dir.join("clipmaster.desktop");
-        let alt_desktop = app_dir.join("com.clipmaster.app.desktop");
-        std::fs::write(&desktop_file, &desktop_content).ok();
-        std::fs::write(&alt_desktop, &desktop_content).ok();
+        let dev_desktop_content = format!(
+            "[Desktop Entry]\nName=ClipMaster\nGenericName=Clipboard Manager\nComment=Windows + V style Clipboard History Manager for Linux\nExec={}\nIcon=clipmaster\nTerminal=false\nType=Application\nCategories=Utility;Accessories;\nStartupNotify=false\nStartupWMClass=app\n",
+            exec_cmd
+        );
 
-        // 3. Refresh desktop & icon caches
+        std::fs::write(app_dir.join("clipmaster.desktop"), &desktop_content).ok();
+        std::fs::write(app_dir.join("com.clipmaster.app.desktop"), &desktop_content).ok();
+        std::fs::write(app_dir.join("app.desktop"), &dev_desktop_content).ok();
+
+        // 4. Refresh desktop & icon caches
         let _ = Command::new("update-desktop-database").arg(&app_dir).output();
         let _ = Command::new("gtk-update-icon-cache")
             .args(["-q", "-t", "-f"])
-            .arg(home_path.join(".local/share/icons/hicolor"))
+            .arg(&hicolor_dir)
             .output();
     }
 }
