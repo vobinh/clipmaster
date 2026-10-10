@@ -89,7 +89,54 @@ pub fn install_gnome_shortcut(shortcut_key: &str) -> bool {
     res.map(|o| o.status.success()).unwrap_or(false)
 }
 
+pub fn ensure_desktop_integration() {
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = std::path::PathBuf::from(&home);
+
+        // 1. Install scalable icon
+        let icon_dir = home_path.join(".local/share/icons/hicolor/scalable/apps");
+        std::fs::create_dir_all(&icon_dir).ok();
+
+        let possible_svgs = [
+            std::path::PathBuf::from("/usr/share/icons/hicolor/scalable/apps/clipmaster.svg"),
+            std::path::PathBuf::from("assets/icon.svg"),
+            std::path::PathBuf::from("../assets/icon.svg"),
+        ];
+
+        for src in &possible_svgs {
+            if src.exists() {
+                std::fs::copy(src, icon_dir.join("clipmaster.svg")).ok();
+                std::fs::copy(src, icon_dir.join("com.clipmaster.app.svg")).ok();
+                break;
+            }
+        }
+
+        // 2. Install desktop launcher
+        let app_dir = home_path.join(".local/share/applications");
+        std::fs::create_dir_all(&app_dir).ok();
+        let exec_cmd = get_executable_command();
+
+        let desktop_content = format!(
+            "[Desktop Entry]\nName=ClipMaster\nGenericName=Clipboard Manager\nComment=Windows + V style Clipboard History Manager for Linux\nExec={}\nIcon=clipmaster\nTerminal=false\nType=Application\nCategories=Utility;Accessories;\nStartupNotify=false\nStartupWMClass=ClipMaster\n",
+            exec_cmd
+        );
+
+        let desktop_file = app_dir.join("clipmaster.desktop");
+        let alt_desktop = app_dir.join("com.clipmaster.app.desktop");
+        std::fs::write(&desktop_file, &desktop_content).ok();
+        std::fs::write(&alt_desktop, &desktop_content).ok();
+
+        // 3. Refresh desktop & icon caches
+        let _ = Command::new("update-desktop-database").arg(&app_dir).output();
+        let _ = Command::new("gtk-update-icon-cache")
+            .args(["-q", "-t", "-f"])
+            .arg(home_path.join(".local/share/icons/hicolor"))
+            .output();
+    }
+}
+
 pub fn ensure_shortcut_registered(db: &Database) {
+    ensure_desktop_integration();
     let shortcut = db.get_setting("shortcut", "<Super>v");
     install_gnome_shortcut(&shortcut);
 }
